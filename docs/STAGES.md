@@ -1,61 +1,31 @@
 # Alltron stages and publication gates
 
-Evidence date: 2026-09-22. This is a proposed schedule of work, not evidence that the appliance or any stage is complete. The existing private Pi and Home Assistant installation are outside every stage. No Alltron development branch has been pushed to GitHub as of this document.
+Evidence date: 2026-09-22. This is the revised software-first plan. The existing private Pi and Home Assistant installation are outside every stage. Physical testing uses a separate device and occurs only after software and simulated acceptance are as complete as possible.
 
-## Stage 0 — Privacy wall and public project rules
+| Stage | Work and exit evidence | Current state |
+| --- | --- | --- |
+| **0. Public safety boundary** | Separate repository, no-reply Git identity, approved public paths, full-history privacy review before each push, fictional fixtures, license and security process. | In progress; repeat before every publication. |
+| **1. Runnable foundation** | Local service and UI, setup and health states, durable timers, documented clean checkout, automated tests and CI. | Timer-only developer preview implemented; owner setup and broader contracts remain. |
+| **2. Household core** | Deterministic commands, alarms, lists and an HA simulator. Test duplicate commands, restarts, offline states and ambiguous actions without hardware. | Planned. |
+| **3. Home Assistant integration** | Reproducible HA Container packaging, owner account onboarding, local authorization, entity selection and selected-entity action allowlist. Test against disposable HA containers and synthetic households. | Planned. |
+| **4. Codex answer boundary** | Restricted answer process, owner device login, bounded input/output, no HA credentials, timeouts and useful auth/limit/network errors. Test with a fake CLI and a disposable signed-in environment. | Planned; ARM64 behavior remains unverified until stage 7. |
+| **5. Voice software** | One service-owned microphone path, local Whisper, wake/push-to-talk, Piper speech, mute and calibration. Use synthetic audio and test cancellation, recovery and asset provenance on development machines. | Planned; device timing and acoustic quality remain unverified until stage 7. |
+| **6. Guided appliance build** | Idempotent installer, prerequisite checks, setup wizard, health dashboard, redacted diagnostics, backup, update, rollback and uninstall. Complete clean virtual-machine/container acceptance and outside-household usability trials where possible. | Planned. |
+| **7. Dedicated Pi acceptance** | On a separate, clearly identified Pi, validate installation, HA/voice/Codex concurrency, ARM64 package support, latency, memory, microphone/speaker/display behavior, reboot, network loss, auth expiry, failed updates and recovery. Revise design and repeat until the supported profile passes. | Waiting for dedicated hardware; this is the last technical gate. |
+| **8. Public beta** | Publish exact supported hardware/OS profile, limitations, release archive, license/asset notices and verified installation steps. Run independent fresh-owner trials on supported devices before calling it ready-made. | Blocked on stages 0–7. |
 
-Create Alltron only in its separate repository. Set an approved source-file manifest, fictional test data, a license decision, secret/file ignores, and a review checklist. Lead/Sol reviews any private-project source read-only; implementation agents receive an Alltron-only OS/container environment with no private mounts or credentials. No bulk copy, shared Git history, symlink or deployment target to the private project.
+Software work may expose questions that require hardware evidence. Record those as explicit stage 7 acceptance risks and build replaceable adapters; do not quietly claim that mock or desktop tests prove Pi performance. No beta release or hardware-support claim precedes stage 7.
 
-**Pass condition:** the complete local branch history and file tree contain only approved public material. Sol High signs off on the privacy boundary before the first push. This gate repeats for every later push.
+## Agent assignments and review
 
-## Stage 1 — Clean skeleton and simulated tests (can start now)
+GPT-6 Luna Medium can take isolated, non-sensitive Alltron work: fictional fixtures, UI, docs, tests, CI and narrowly scoped modules after contracts are agreed. Same-host agents are **not isolated** from the private source by a worktree alone; sensitive implementation stays with the lead or a genuinely isolated OS/container environment. GPT-6 Sol High reviews security-sensitive contracts before implementation, then examines diffs, tests, dependency provenance and the complete public push range. The lead integrates work and records exact release evidence.
 
-Define the Python service, local web UI, health states, setup state and contracts for timers, Home Assistant, voice and Codex answers. Add mock HA, fake CLI and synthetic audio fixtures. Luna Medium builds the non-sensitive scaffold and CI from the approved manifest; Sol High reviews interfaces and diffs. The current Pi is never used.
+## Privacy gate before every GitHub push
 
-**Pass condition:** a clean checkout builds and tests without the private repository, real accounts or hardware. The UI and fixtures contain no real household names, photos, device IDs, addresses or calendar entries.
+1. Start from the public Alltron history. Never import the private project's history, source tree, symlink, state, recordings, photos, models, credentials or deployment targets. Review an explicit path allowlist.
+2. Inspect **all new commits and Git objects**, including deleted files, binary assets and author/committer metadata. Run a secret scanner and manually check for names, addresses, device IDs, calendar data, media and personal configuration; `.gitignore` alone is insufficient.
+3. If any questionable content entered a commit, rebuild from the clean public base before pushing. Removing it in a later commit does not remove exposure from public history.
+4. Sol High reviews the exact SHA and final diff before a branch push. Use GitHub protection and scanning as additional controls, and verify release archives separately.
+5. Keep every fixture invented and every support bundle redacted. Never publish account tokens, Codex auth state, real household data or current-Pi addresses.
 
-## Stage 2 — Dedicated Pi feasibility gate
-
-After a separate test Pi is available, test local Whisper, speech synthesis, wake detection, Home Assistant Container and Chromium together. Test Codex CLI device login, isolated noninteractive answers, latency and account limits. Prototype HA owner authorization and its local callback. Record exact Pi/OS/audio hardware, memory headroom, response times and failures. A failed Codex or hardware gate returns to design review before dependent implementation.
-
-**Pass condition:** Sol High accepts a measured supported-hardware profile, the Codex isolation/auth path, the HA authorization path and explicit performance targets. No public "ready-made" or hardware-support claim precedes this evidence.
-
-## Stage 3 — Local household controls
-
-Port durable timers and alarms, selected HA lights and to-do lists, and the deterministic command router. Keep HA actions bound to a user-selected entity/action allowlist. Luna Medium implements and tests; Sol High reviews duplicate actions, restart recovery, ambiguous writes and failure reporting.
-
-**Pass condition:** touch and typed commands work with the PC off; timers recover after restart; unavailable HA never produces a false success message.
-
-## Stage 4 — Pi voice pipeline
-
-Implement one service-owned microphone path for push-to-talk, wake, utterance capture, Pi Whisper transcription and Pi speech playback. Provide mute and audio calibration. Luna Medium implements behind the approved contract; Sol High reviews microphone ownership, cancellation, wake retrigger and asset licenses.
-
-**Pass condition:** spoken local controls work across browser refresh, service restart and ordinary room noise on the dedicated test Pi. Speech timing and memory remain within the agreed hardware profile.
-
-## Stage 5 — Owner Codex answers
-
-Implement a narrowly scoped answer adapter around the owner's Codex CLI login. The assistant sends bounded question text and returns an answer; it cannot directly mutate HA or access the household credential store. Give the Codex process a restricted OS identity, no private mounts, explicit timeout/cancel behavior and isolated configuration. Luna Medium implements the adapter/test harness; Sol High threat-models the boundary before coding and reviews final behavior.
-
-**Pass condition:** login, logout/reconnect, ordinary answers, usage-limit, network-loss, timeout and cancellation cases are tested on the target Pi. No account credential appears in UI payloads, logs or support bundles.
-
-## Stage 6 — Guided installation and recovery
-
-Build a versioned installer, narrowly scoped privileged helper, first-run HA account/authorization flow, entity selection, audio checks, health dashboard, redacted diagnostics, backup and rollback. Luna Medium builds the wizard and recovery flows; Sol High reviews helper privileges, credential storage and update failure behavior.
-
-**Pass condition:** a fresh owner can install and use core features without editing JSON or shell scripts during normal setup. A failed update restores the prior working release and saved household data.
-
-## Stage 7 — Public beta and support
-
-Run fresh-install trials with people outside this household using only the supported hardware list. Publish installation/uninstall docs, privacy/offline behavior, license and dependency notices, fictional screenshots, issue templates and a security reporting path. Post code through small `codex/` branch PRs; the first public PR is plan-only and labeled pre-alpha. A beta release follows physical acceptance and independent setup trials.
-
-**Pass condition:** every pushed commit and release artifact passes the privacy gate below, and the README describes only capabilities verified on the supported profile.
-
-## Privacy gate before **every** GitHub push
-
-1. Start the branch from the public Alltron base; never import the private project's commit history or copy a whole source directory. Review an explicit allowlist of paths and assets. `.gitignore` is a backup check, not proof that ignored content cannot be added deliberately.
-2. Inspect the **entire commit range and Git objects**, not only the final working tree. Review diff, file names, binary assets, generated artifacts, and Git author/committer names and email addresses. Run automated secret scanning locally before pushing; manually inspect names, addresses, calendar/device identifiers, audio, images, model weights and operational notes because generic scanners miss many of them.
-3. Do not push a branch containing a questionable commit and then delete the file. A public branch exposes its earlier commits. Rebuild a clean branch from the public base if any private content ever entered its history.
-4. Sol High reviews the final proposed push range and release archive. The lead records approval of the exact commit SHA to push. GitHub secret scanning/push protection should be enabled as an additional layer, not relied on as the first filter.
-5. No credentials, pairing data, personal files, household media, real recordings, current-Pi addresses or private test results may be pushed. All screenshots and test fixtures use invented households and devices.
-
-Current state: the local branch contains planning documents and the ignore rules only; no branch or PR was published in this task. The planning commit uses a GitHub no-reply author and committer identity. The original GitHub `main` commit predates this plan and its metadata must be considered separately. The dedicated test Pi is not yet available. Hardware choice, public wake word/voice defaults and first-beta feature scope remain open.
+The initial public GitHub commit predates this plan and contains a personal email in its Git metadata. The local Alltron development commit was rewritten to the chosen GitHub no-reply identity. Repository history already public cannot be made private by a later commit.
