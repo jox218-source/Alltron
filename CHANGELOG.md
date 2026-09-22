@@ -5,6 +5,7 @@ Alltron is in pre-alpha. Entries describe development work, not verified Raspber
 ## 0.1.0a0 — Unreleased
 
 - Added the Stage 0 publication gate: exact public path manifest, full post-root commit and blob audit, no-reply identity checks, historical secret scanning and CI enforcement.
+- Added an optional local pre-push guard and protected GitHub `main` with PR and privacy/test checks.
 - Added a loopback-only Python developer preview with a local dashboard and durable SQLite timers.
 - Added a browser chime for completed timers while the page is open, plus health and timer APIs.
 - Added package installation, automated tests, CI, contributor and security files, and preview installation/troubleshooting docs.
