@@ -13,7 +13,7 @@ Thanks for helping make Alltron easier to install and operate. Alltron is in pre
 
 The project is not yet at a stable developer setup. Follow the README's current setup instructions. If a step is missing or fails, report the exact command, operating system, Python/runtime versions, and a redacted error excerpt. Do not paste tokens, local IP addresses, usernames, or full environment dumps.
 
-Before submitting, run the checks documented for the area you changed. If no automated check exists, say so in the pull request and include a concise manual verification procedure. Do not claim Raspberry Pi verification unless it was performed on a dedicated test device and the model, OS, and result are recorded without identifying the device or network.
+Before submitting, run the checks documented for the area you changed. Maintainers run the [publication privacy gate](docs/PUBLICATION_GATE.md) on the exact commit before each push; contributors should use a GitHub no-reply commit identity and avoid adding paths outside the reviewed manifest. If no automated behavior check exists, say so in the pull request and include a concise manual verification procedure. Do not claim Raspberry Pi verification unless it was performed on a dedicated test device and the model, OS, and result are recorded without identifying the device or network.
 
 ## Pull requests
 

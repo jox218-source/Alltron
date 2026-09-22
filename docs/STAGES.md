@@ -4,7 +4,7 @@ Evidence date: 2026-09-22. This is the revised software-first plan. The existing
 
 | Stage | Work and exit evidence | Current state |
 | --- | --- | --- |
-| **0. Public safety boundary** | Separate repository, no-reply Git identity, approved public paths, full-history privacy review before each push, fictional fixtures, license and security process. | In progress; repeat before every publication. |
+| **0. Public safety boundary** | Separate repository, no-reply Git identity, approved public paths, full-history privacy review before each push, fictional fixtures, license and security process. | Gate implemented; repeat and obtain exact-SHA review before every publication. The legacy root-email exception remains documented. |
 | **1. Runnable foundation** | Local service and UI, setup and health states, durable timers, documented clean checkout, automated tests and CI. | Timer-only developer preview implemented; owner setup and broader contracts remain. |
 | **2. Household core** | Deterministic commands, alarms, lists and an HA simulator. Test duplicate commands, restarts, offline states and ambiguous actions without hardware. | Planned. |
 | **3. Home Assistant integration** | Reproducible HA Container packaging, owner account onboarding, local authorization, entity selection and selected-entity action allowlist. Test against disposable HA containers and synthetic households. | Planned. |
@@ -23,9 +23,9 @@ GPT-6 Luna Medium can take isolated, non-sensitive Alltron work: fictional fixtu
 ## Privacy gate before every GitHub push
 
 1. Start from the public Alltron history. Never import the private project's history, source tree, symlink, state, recordings, photos, models, credentials or deployment targets. Review an explicit path allowlist.
-2. Inspect **all new commits and Git objects**, including deleted files, binary assets and author/committer metadata. Run a secret scanner and manually check for names, addresses, device IDs, calendar data, media and personal configuration; `.gitignore` alone is insufficient.
+2. Run [the publication gate](PUBLICATION_GATE.md). Inspect **all new commits and Git objects**, including deleted files, binary assets and author/committer metadata. Run a secret scanner and manually check for names, addresses, device IDs, calendar data, media and personal configuration; `.gitignore` alone is insufficient.
 3. If any questionable content entered a commit, rebuild from the clean public base before pushing. Removing it in a later commit does not remove exposure from public history.
 4. Sol High reviews the exact SHA and final diff before a branch push. Use GitHub protection and scanning as additional controls, and verify release archives separately.
 5. Keep every fixture invented and every support bundle redacted. Never publish account tokens, Codex auth state, real household data or current-Pi addresses.
 
-The initial public GitHub commit predates this plan and contains a personal email in its Git metadata. The local Alltron development commit was rewritten to the chosen GitHub no-reply identity. Repository history already public cannot be made private by a later commit.
+The initial public GitHub commit predates this plan and contains a personal email in its Git metadata. The published development commits use the chosen GitHub no-reply identity. Repository history already public cannot be made private by a later commit.

@@ -39,6 +39,6 @@ We are doing software implementation, simulation, setup design, and automated ac
 
 ## Contribute and get help
 
-Start with [installation](docs/INSTALL.md), [troubleshooting](docs/TROUBLESHOOTING.md), and [architecture](docs/ARCHITECTURE.md). Contributions are welcome through [the contribution guide](CONTRIBUTING.md). Use [support guidance](SUPPORT.md) for questions and [the security policy](SECURITY.md) for vulnerabilities. Never post household tokens, device identifiers, recordings, or private diagnostics in public issues.
+Start with [installation](docs/INSTALL.md), [troubleshooting](docs/TROUBLESHOOTING.md), and [architecture](docs/ARCHITECTURE.md). Contributions are welcome through [the contribution guide](CONTRIBUTING.md); every push follows the [publication privacy gate](docs/PUBLICATION_GATE.md). Use [support guidance](SUPPORT.md) for questions and [the security policy](SECURITY.md) for vulnerabilities. Never post household tokens, device identifiers, recordings, or private diagnostics in public issues.
 
 Alltron-owned code is licensed under [GPL-3.0-only](LICENSE). Third-party voice engines, models, wake assets, and other redistributable components will be inventoried and reviewed before they are bundled.
