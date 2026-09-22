@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+head_sha=$(git rev-parse HEAD)
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$local_ref" in
+        refs/tags/*)
+            echo "Alltron privacy gate: tag publication needs a separate tag-metadata and release review." >&2
+            exit 1
+            ;;
+    esac
+    case "$local_sha" in
+        0000000000000000000000000000000000000000) continue ;;
+    esac
+    pushed_commit=$(git rev-parse "$local_sha^{commit}")
+    if [ "$pushed_commit" != "$head_sha" ]; then
+        echo "Alltron privacy gate: check out the exact commit being pushed and retry." >&2
+        exit 1
+    fi
+done
+
+exec python "$repo_root/tools/publication_audit.py" --repo "$repo_root" --head "$head_sha"

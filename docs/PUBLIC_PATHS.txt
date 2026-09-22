@@ -1,0 +1,37 @@
+# Exact public source paths approved for Alltron Stage 0.
+# Adding a path requires human review before the next public push.
+.github/ISSUE_TEMPLATE/bug_report.yml
+.github/ISSUE_TEMPLATE/feature_request.yml
+.github/PULL_REQUEST_TEMPLATE.md
+.github/dependabot.yml
+.github/workflows/ci.yml
+.githooks/pre-push
+.gitattributes
+.gitignore
+AGENTS.md
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+LICENSE
+README.md
+SECURITY.md
+SUPPORT.md
+docs/ARCHITECTURE.md
+docs/BUILD_AND_RELEASE_PLAN.md
+docs/INSTALL.md
+docs/PRIVACY.md
+docs/PUBLICATION_GATE.md
+docs/PUBLIC_PATHS.txt
+docs/STAGES.md
+docs/TROUBLESHOOTING.md
+pyproject.toml
+src/alltron/__init__.py
+src/alltron/__main__.py
+src/alltron/server.py
+src/alltron/static/app.css
+src/alltron/static/app.js
+src/alltron/static/index.html
+src/alltron/timers.py
+tests/test_preview.py
+tests/test_publication_audit.py
+tools/publication_audit.py

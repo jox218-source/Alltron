@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alltron developer preview</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand"><span class="mark" aria-hidden="true">●</span> ALLTRON <span class="tag">DEVELOPER PREVIEW</span></div>
+      <h1>A calmer home starts here.</h1>
+      <p class="lede">A local workspace for building a dependable household assistant.</p>
+    </header>
+
+    <section class="notice" aria-label="Preview status">
+      <strong>What works today</strong>
+      <span>Local timers, saved across restarts. Home Assistant, voice, and Codex connections are still in development.</span>
+    </section>
+
+    <div class="grid">
+      <section class="panel" aria-labelledby="timers-title">
+        <div class="panel-heading"><h2 id="timers-title">Timers</h2><span class="pill">LOCAL</span></div>
+        <p>Set a timer and leave this page open to hear a chime when it finishes. Timers remain saved when the service restarts.</p>
+        <form id="timer-form">
+          <label for="timer-label">Name</label>
+          <input id="timer-label" name="label" maxlength="80" value="Tea" autocomplete="off">
+          <label for="timer-minutes">Minutes</label>
+          <div class="row"><input id="timer-minutes" name="minutes" type="number" min="1" max="1440" value="5" required><button type="submit">Start timer</button></div>
+        </form>
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+        <ul id="timer-list" class="timer-list" aria-live="polite"></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="connect-title">
+        <div class="panel-heading"><h2 id="connect-title">Connections</h2><span class="pill subdued">COMING NEXT</span></div>
+        <div id="connections" class="connections" aria-live="polite"></div>
+        <p class="fine">Alltron does not collect account logins in this preview. Future setup will keep Home Assistant and Codex credentials on the owner’s device.</p>
+      </section>
+    </div>
+
+    <footer><span id="service-status">Connecting to local service…</span><span>Open source · Pre-alpha</span></footer>
+  </main>
+</body>
+</html>

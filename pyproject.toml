@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alltron"
+version = "0.1.0a0"
+description = "Local-first household assistant developer preview"
+requires-python = ">=3.11"
+license = {text = "GPL-3.0-only"}
+authors = [{name = "Alltron contributors"}]
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+audit = ["detect-secrets==1.5.0"]
+
+[project.scripts]
+alltron = "alltron.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+alltron = ["static/*"]
