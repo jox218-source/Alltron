@@ -1,7 +1,7 @@
 """Fail-closed privacy check for an Alltron branch before public push.
 
 This check supplements, and never replaces, human review of the exact commit SHA.
-The original public root commit is the documented legacy metadata exception.
+Two already-public commits have documented metadata exceptions by exact SHA.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 LEGACY_PUBLIC_BASE = "".join(("b400f035", "ea3d6925", "4d71bec5", "ced2a2fe", "1cdd4557"))
+KNOWN_PUBLIC_METADATA_EXCEPTION = "".join(("1255bc21", "679663b0", "5b6a1713", "ca671420", "79853c2a"))
 EXPECTED_REMOTES = {
     "https://github.com/jox218-source/Alltron",
     "git" + "@" + "github.com:jox218-source/Alltron",
@@ -97,9 +98,15 @@ def audit_history(repo: Path, base: str, head: str, manifest: set[str], *, run_s
             problems.append(f"{commit[:12]}: unreadable commit metadata")
             continue
         author, author_email, committer, committer_email, message = fields
-        if not valid_identity(author, author_email) or not valid_identity(committer, committer_email):
+        if commit != KNOWN_PUBLIC_METADATA_EXCEPTION and (
+            not valid_identity(author, author_email) or not valid_identity(committer, committer_email)
+        ):
             problems.append(f"{commit[:12]}: author or committer lacks approved no-reply identity")
-        problems.extend(scan_text(message.encode("utf-8"), f"{commit[:12]} message"))
+        message_bytes = message.encode("utf-8")
+        if commit == KNOWN_PUBLIC_METADATA_EXCEPTION:
+            # This exact immutable merge also has an already-public email in its message.
+            message_bytes = CONTENT_RULES[0][1].sub(b"[documented public email]", message_bytes)
+        problems.extend(scan_text(message_bytes, f"{commit[:12]} message"))
         entries = git(repo, "ls-tree", "-r", "-z", commit).split(b"\0")
         for entry in entries:
             if not entry:
