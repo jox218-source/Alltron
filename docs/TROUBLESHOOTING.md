@@ -2,7 +2,7 @@
 
 ## Current status
 
-Alltron is pre-alpha. A local timer-only developer preview exists, but there is no Pi appliance installer, Home Assistant or Codex integration, audio pipeline, or supported hardware profile. The entries below distinguish preview behavior from future recovery requirements.
+Alltron is pre-alpha. A local preview has timers, typed commands, shopping items and opt-in speech adapters, but there is no Pi appliance installer, Home Assistant or Codex integration, accepted live speech path, or supported hardware profile. The entries below distinguish preview behavior from future recovery requirements.
 
 ## Run the local timer preview
 
@@ -28,9 +28,13 @@ The preview updates a running timer to `done` when its due time has passed and t
 
 Hardware support is not established. The separate test Pi is not yet available. A supported model, RAM size, operating system, display, microphone, speaker, and storage profile will be published only after concurrent audio, Home Assistant, and kiosk tests pass on that device.
 
+## Voice controls are disabled or fail
+
+Voice is disabled by default. This preview needs a service-owned ALSA input, local Whisper/Piper tools and models, and a selected output before the corresponding health states can become ready. A path check is not a spoken setup test. See [speech development](VOICE_DEVELOPMENT.md); do not place recordings or model assets in a public issue. Wake detection is still disabled.
+
 ## Account setup does not work
 
-The Home Assistant authorization flow, Codex CLI sign-in integration, Whisper, microphone capture, and service-owned Pi alarms/speech are not implemented. Their absence is expected in this preview. Do not share credentials or tokens to diagnose the project. Future setup diagnostics should report whether the issue is authorization, network access, account limits, or a service failure without printing credential contents.
+The Home Assistant authorization flow and Codex CLI sign-in integration are not implemented. Speech and alarm adapters exist but have not passed live Pi acceptance. Do not share credentials or tokens to diagnose the project. Future setup diagnostics should report whether the issue is authorization, network access, account limits, or a service failure without printing credential contents.
 
 ## How to report a future bug
 

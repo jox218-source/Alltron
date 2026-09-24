@@ -2,7 +2,7 @@
 
 ## Status
 
-This document separates the current developer preview from the proposed appliance architecture. The Python preview now serves a loopback-only HTTP UI/API, stores timer state in SQLite, and can play a short browser chime when a timer finishes while the page is open and the browser allows audio. It is not a Pi-tested appliance. Home Assistant, Codex, Whisper, microphone capture, service-owned alarms/speech, service units, and an installer remain unimplemented. The dedicated Pi feasibility gate remains open.
+This document separates the current developer preview from the proposed appliance architecture. The loopback-only Python preview stores timers, alarms and shopping items in SQLite, routes a small explicit local command set, and can play a browser timer chime while the page is open. Opt-in adapters now support service-owned push-to-talk capture, local Whisper/Piper CLI calls and a generated service alarm tone. These adapters have only simulated tests: no engine/model is bundled, no live speech or Pi hardware profile is accepted, and wake detection remains disabled. Home Assistant, Codex, service units and an owner installer remain unimplemented.
 
 ## Intended deployment
 
@@ -10,11 +10,11 @@ The target is one Raspberry Pi running the Alltron application and Home Assistan
 
 ## Current developer preview
 
-The Python 3.11+ package has no third-party runtime dependencies. `alltron` starts a standard-library threaded HTTP server bound to `127.0.0.1`; `alltron --check` prints local preflight information and exits. The service exposes a health endpoint, a timer list/create/cancel API, and serves the bundled UI assets. Timer records are stored in SQLite under the local data directory (overridable with `ALLTRON_DATA_DIR`). The browser plays a brief chime when a timer finishes if the UI page is open and browser audio is allowed. This page-local chime is not a service-owned Pi alarm: closing the page or browser prevents it from sounding. The preview does not run a wake-word detector, transcribe speech, call Home Assistant, or call Codex.
+The Python 3.11+ package has no third-party runtime dependencies by default. `alltron` starts a standard-library threaded HTTP server bound to `127.0.0.1`; `alltron --check` prints local preflight information and exits. The service exposes health, timer, alarm, shopping-list, typed-command and opt-in voice-control endpoints. One SQLite file under `ALLTRON_DATA_DIR` holds durable local state. The browser timer chime still requires an open page; a separate service alarm tone needs a selected ALSA output and remains unverified on Pi. The preview has no wake-word detector, Home Assistant call or Codex call.
 
 Contributor setup and run instructions are in [Installation](INSTALL.md). The preview must remain on loopback; its HTTP interface is not designed for LAN or internet exposure.
 
-The preview endpoints are `GET /api/health`, `GET /api/timers`, `POST /api/timers`, and `POST /api/timers/cancel`. They support timer status, creation, and cancellation only. The health response marks Home Assistant, Codex, and voice as not configured.
+The preview keeps the timer endpoints and adds `GET/POST /api/alarms`, `POST /api/alarms/cancel`, `GET/POST /api/lists/shopping`, `POST /api/lists/shopping/complete`, `POST /api/commands`, and opt-in `POST /api/voice/{start,stop,cancel}` with `GET /api/voice/events`. The browser sends only control events for voice; the local service owns microphone capture. Health reports Home Assistant and Codex as not configured, and voice wake/capture/STT/TTS separately as disabled, unavailable or ready with a verification flag where applicable. A ready path check is not full spoken acceptance.
 
 ```text
 Touchscreen / kiosk
@@ -45,9 +45,9 @@ These are target constraints, not verified properties of a running system. See t
 | --- | --- | --- |
 | Touchscreen UI | Setup, touch controls, health and recovery guidance | Basic developer preview UI for timers; owner setup/recovery UI is planned |
 | Application service | Local API, configuration, orchestration and persistence | Loopback preview server and timer persistence implemented; appliance orchestration is planned |
-| Household command router | Validate requests and call selected HA entities | Planned; no adapter or allowlist |
+| Household command router | Validate requests and call selected HA entities | Explicit local grammar implemented; HA adapter and allowlist planned |
 | Home Assistant | Run as a container on the same Pi; owner creates account and authorizes Alltron | Deployment target only; no installer or auth flow |
-| Audio | Pi-owned microphone path, local Whisper transcription, local speech output, push-to-talk fallback | Not implemented; hardware and asset choices unverified |
+| Audio | Pi-owned microphone path, local Whisper transcription, local speech output, push-to-talk fallback | Opt-in local adapters and simulated tests; wake, asset selection and live acceptance open |
 | Codex answers | Restricted CLI process for bounded general questions | Feasibility gate; no adapter |
 | Installer / updater | Prerequisite checks, setup, backup, update and rollback | Planned; no installer or helper |
 
@@ -55,4 +55,4 @@ These are target constraints, not verified properties of a running system. See t
 
 Typed or transcribed input should first enter the local router. Supported household commands are parsed and validated locally before reaching Home Assistant. An ordinary question may go to the Codex adapter, which returns text for local display or speech. A model answer must never be treated as an authorized Home Assistant command. Timers should be stored locally so they survive a service restart.
 
-In the developer preview, timer requests flow from the local UI to the loopback API and SQLite store. Timer state is durable across service restarts. When the page is open and audio is allowed, the browser plays a chime after it observes a timer marked done. There is no service-owned alarm or Pi speech output, so the chime is not guaranteed when the page is closed, suspended, or audio is blocked. The broader household data flow above is a design target; its behavior has not been implemented or measured. Offline behavior, retention periods, telemetry policy, and the exact authorization method remain release decisions that must be settled and documented before beta.
+In the developer preview, timer and list requests flow from the local UI to the loopback API and SQLite store. Timer state is durable across service restarts. The browser chime may be missed when the page is closed or audio is blocked. An opt-in alarm service tracks `played` versus `missed` separately; its speaker output has not passed physical acceptance. Optional voice capture sends transient PCM from the service microphone to local Whisper, passes the transcript through the explicit local router and can speak the response through Piper. No recording is sent to Home Assistant or Codex in this preview. Offline behavior, retention periods, telemetry policy and owner authorization still need release decisions before beta.

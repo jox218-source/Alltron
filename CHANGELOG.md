@@ -4,6 +4,8 @@ Alltron is in pre-alpha. Entries describe development work, not verified Raspber
 
 ## 0.1.0a0 — Unreleased
 
+- Began Stage 1 from the public timer preview: explicit local commands, shopping-list state, alarm records and opt-in service tone, plus simulated speech and a service-owned push-to-talk path. Wake detection and physical speech acceptance remain open.
+- Added the sanitized reuse checklist and narrowed the roadmap to stages 0–5; the private app and Pi remain outside Alltron development.
 - Added the Stage 0 publication gate: exact public path manifest, full post-root commit and blob audit, no-reply identity checks, historical secret scanning and CI enforcement.
 - Added an optional local pre-push guard and protected GitHub `main` with PR and privacy/test checks.
 - Added a loopback-only Python developer preview with a local dashboard and durable SQLite timers.
