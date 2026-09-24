@@ -2,7 +2,7 @@
 
 ## Current status
 
-Alltron is pre-alpha and its final data flows are not yet implemented or verified. This document describes project requirements and intended behavior, not a claim that every control is already available. Confirm actual behavior in the current release before connecting household services.
+Alltron is pre-alpha and its final data flows are not yet implemented or verified. The current preview keeps timer, alarm and shopping entries in a local SQLite file. Opt-in voice uses service-owned capture and local CLI engines only; temporary inference WAVs are deleted after each request and voice events, which may include a transcript, expire from memory after two minutes. The preview has no Home Assistant or Codex connection. Browser voice controls send no audio. This is source behavior, not live hardware acceptance.
 
 ## Intended design
 

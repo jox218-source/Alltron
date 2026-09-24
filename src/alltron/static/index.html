@@ -17,7 +17,7 @@
 
     <section class="notice" aria-label="Preview status">
       <strong>What works today</strong>
-      <span>Local timers, saved across restarts. Home Assistant, voice, and Codex connections are still in development.</span>
+      <span>Local timers, typed commands, a shopping list and service-side push-to-talk controls are available in this preview. Voice capture uses the local service; spoken setup still needs verification. Home Assistant and Codex connections are in development.</span>
     </section>
 
     <div class="grid">
@@ -34,9 +34,40 @@
         <ul id="timer-list" class="timer-list" aria-live="polite"></ul>
       </section>
 
+      <section class="panel" aria-labelledby="command-title">
+        <div class="panel-heading"><h2 id="command-title">Command preview</h2><span class="pill subdued">TEXT ONLY</span></div>
+        <p>Send a typed command to the local service and review its response.</p>
+        <form id="command-form">
+          <label for="command-text">Command</label>
+          <div class="row command-row"><input id="command-text" name="text" maxlength="500" autocomplete="off" required><button type="submit">Send</button></div>
+        </form>
+        <p id="command-message" class="message" role="status" aria-live="polite"></p>
+        <dl id="command-result" class="command-result" aria-live="polite"></dl>
+      </section>
+
+      <section class="panel" aria-labelledby="shopping-title">
+        <div class="panel-heading"><h2 id="shopping-title">Shopping list</h2><span class="pill">LOCAL</span></div>
+        <form id="shopping-form">
+          <label for="shopping-text">Add an item</label>
+          <div class="row command-row"><input id="shopping-text" name="text" maxlength="120" autocomplete="off" required><button type="submit">Add item</button></div>
+        </form>
+        <p id="shopping-message" class="message" role="status" aria-live="polite"></p>
+        <ul id="shopping-list" class="shopping-list" aria-live="polite"></ul>
+      </section>
+
       <section class="panel" aria-labelledby="connect-title">
         <div class="panel-heading"><h2 id="connect-title">Connections</h2><span class="pill subdued">COMING NEXT</span></div>
         <div id="connections" class="connections" aria-live="polite"></div>
+        <h3 class="voice-heading">Voice status</h3>
+        <p class="fine">Push-to-talk is handled by the local service. This page does not record audio in your browser.</p>
+        <div id="voice-status" class="connections" aria-live="polite"></div>
+        <p id="voice-verification" class="fine" role="status" aria-live="polite"></p>
+        <div class="voice-controls">
+          <button id="voice-toggle" type="button" disabled>Start push to talk</button>
+          <button id="voice-cancel" class="secondary" type="button" disabled>Cancel</button>
+        </div>
+        <p id="voice-message" class="message" role="status" aria-live="polite"></p>
+        <ol id="voice-events" class="voice-events" aria-label="Voice activity"></ol>
         <p class="fine">Alltron does not collect account logins in this preview. Future setup will keep Home Assistant and Codex credentials on the owner’s device.</p>
       </section>
     </div>

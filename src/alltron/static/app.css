@@ -22,6 +22,7 @@ input { width:100%; border:1px solid #50616a; background:#10171e; color:#fff; bo
 input:focus-visible,button:focus-visible { outline:3px solid #88e9b9; outline-offset:2px; }
 .row { display:flex; gap:10px; }
 .row input { width:120px; }
+.row.command-row input { width:auto; flex:1; min-width:0; }
 button { border:0; background:#8fe6bd; color:#0b2520; border-radius:10px; padding:13px 19px; font:inherit; font-weight:800; cursor:pointer; }
 button:hover { background:#b7f6d6; }
 button.secondary { background:#33444b; color:#e7f0ef; padding:8px 11px; font-size:12px; }
@@ -30,6 +31,17 @@ button.secondary { background:#33444b; color:#e7f0ef; padding:8px 11px; font-siz
 .timer-list li { border-top:1px solid #38454c; padding:13px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .timer-title { font-weight:700; }
 .timer-detail { font-size:13px; color:#aebdc2; display:block; margin-top:4px; }
+.command-result { display:grid; grid-template-columns:auto 1fr; gap:8px 16px; margin:12px 0 0; }
+.command-result dt { color:#aebdc2; font-size:13px; }
+.command-result dd { margin:0; overflow-wrap:anywhere; }
+.shopping-list { list-style:none; padding:0; margin:0; }
+.shopping-list li { border-top:1px solid #38454c; padding:11px 0; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.shopping-list .done { color:#94a6ad; text-decoration:line-through; }
+.voice-heading { font-size:16px; margin:24px 0 -14px; }
+.voice-controls { display:flex; gap:10px; margin:16px 0 10px; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+.voice-events { list-style:none; padding:0; margin:10px 0 0; max-height:220px; overflow:auto; }
+.voice-events li { border-top:1px solid #38454c; padding:10px 0; color:#c1d0d3; font-size:13px; overflow-wrap:anywhere; }
 .connections { display:grid; gap:12px; margin-top:27px; }
 .connection { display:flex; justify-content:space-between; gap:12px; align-items:center; background:#131b22; border:1px solid #35444b; padding:17px; border-radius:12px; }
 .connection strong { display:block; }
