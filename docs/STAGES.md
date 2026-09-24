@@ -25,4 +25,4 @@ GPT-6 Luna Medium can implement fictional fixtures, UI, docs, CI, tests and narr
 4. Sol High reviews the exact SHA and final diff before a branch push. Use GitHub protection and scanning as additional controls, and verify release archives separately.
 5. Keep every fixture invented and every support bundle redacted. Never publish account tokens, Codex auth state, real household data or current-Pi addresses. Source/model licensing and provenance review remains required even when using the same upstream engines as the private app.
 
-The initial public GitHub commit predates this plan and contains a personal email in its Git metadata. The published development commits use the chosen GitHub no-reply identity. Repository history already public cannot be made private by a later commit.
+The initial public GitHub commit and the already-merged PR #1 squash commit contain a personal email in Git author metadata. The development commits use the chosen GitHub no-reply identity. Both published exposures are documented in [PUBLICATION_GATE.md](PUBLICATION_GATE.md); a later commit cannot make public history private.
