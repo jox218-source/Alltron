@@ -10,7 +10,7 @@ The target is one Raspberry Pi running the Alltron application and Home Assistan
 
 ## Current developer preview
 
-The Python 3.11+ package has no third-party runtime dependencies by default. `alltron` starts a standard-library threaded HTTP server bound to `127.0.0.1`; `alltron --check` prints local preflight information and exits. The service exposes health, timer, alarm, shopping-list, typed-command and opt-in voice-control endpoints. One SQLite file under `ALLTRON_DATA_DIR` holds durable local state. The browser timer chime still requires an open page; a separate service alarm tone needs a selected ALSA output and remains unverified on Pi. The preview has no wake-word detector, Home Assistant call or Codex call.
+The Python 3.11+ package has no third-party runtime dependencies by default. `alltron` starts a standard-library threaded HTTP server bound to `127.0.0.1`; `alltron --check` prints local preflight information and exits. The service exposes health, timer, alarm, shopping-list, typed-command and opt-in voice-control endpoints. One SQLite file under `ALLTRON_DATA_DIR` holds durable local state. The browser timer chime still requires an open page; a separate service alarm tone needs a selected ALSA output and remains unverified on Pi. The preview has no wake-word detector or Codex call; Home Assistant calls require the owner to opt in with private configuration.
 
 Contributor setup and run instructions are in [Installation](INSTALL.md). The preview must remain on loopback; its HTTP interface is not designed for LAN or internet exposure.
 
