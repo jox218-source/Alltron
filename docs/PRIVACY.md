@@ -2,7 +2,7 @@
 
 ## Current status
 
-Alltron is pre-alpha and its final data flows are not yet implemented or verified. The current preview keeps timer, alarm and shopping entries in a local SQLite file. Opt-in voice uses service-owned capture and local CLI engines only; temporary inference WAVs are deleted after each request and voice events, which may include a transcript, expire from memory after two minutes. The preview has no Home Assistant or Codex connection. Browser voice controls send no audio. This is source behavior, not live hardware acceptance.
+Alltron is pre-alpha and its final data flows are not yet verified. The current preview keeps timer, alarm and shopping entries in a local SQLite file. Opt-in voice uses service-owned capture and local CLI engines only; temporary inference WAVs are deleted after each request and voice events, which may include a transcript, expire from memory after two minutes. An optional Home Assistant prototype sends a selected entity ID and on/off action with an owner-created bearer token to `127.0.0.1` only. The token and alias configuration are loaded from private files outside the repository. The running service does not enable Codex answers. Browser voice controls send no audio. This is source behavior and simulated test evidence, not live integration or hardware acceptance.
 
 ## Intended design
 

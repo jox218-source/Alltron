@@ -2,9 +2,9 @@
 
 ## Current status
 
-**Alltron is pre-alpha.** The repository contains a local Python preview for timers, typed commands, shopping items and opt-in speech adapters. It is not an appliance installer. It does not install Home Assistant or connect to Codex, and no live speech or Raspberry Pi profile has been accepted. The default run leaves audio disabled; see [speech development](VOICE_DEVELOPMENT.md) for the opt-in contributor path. Do not install this preview on a production household Pi.
+**Alltron is pre-alpha.** The repository contains a local Python preview for timers, typed commands, shopping items, opt-in speech adapters and an opt-in Home Assistant light/switch prototype. It is not an appliance installer. It does not install Home Assistant or connect the running service to Codex, and no live speech or Raspberry Pi profile has been accepted. The default run leaves audio and Home Assistant disabled; see [speech development](VOICE_DEVELOPMENT.md) and [Stage 2 development](STAGE2_DEVELOPMENT.md) for test-only paths. Do not install this preview on a production household Pi.
 
-The commands below run the developer preview on a computer with Python 3.11 or newer. The owner installation guide for the future Pi appliance will be written after its installer and recovery path are implemented and tested on a dedicated device. The intended first setup is designed to install Home Assistant Container on the same Pi, then guide the owner through Home Assistant authorization and their own Codex CLI sign-in. Neither account flow is implemented yet.
+The commands below run the developer preview on a computer with Python 3.11 or newer. The owner installation guide for the future Pi appliance will be written after its installer and recovery path are implemented and tested on a dedicated device. The intended first setup is designed to install Home Assistant Container on the same Pi, then guide the owner through Home Assistant authorization and their own Codex CLI sign-in. The current HA token-file prototype is for disposable tests; no guided account flow is implemented yet.
 
 ## For contributors
 

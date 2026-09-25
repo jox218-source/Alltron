@@ -13,6 +13,7 @@ from uuid import UUID
 from . import __version__
 from .alarms import AlarmService
 from .commands import CommandRouter
+from .home_assistant import HomeAssistant
 from .timers import TimerStore
 from .voice import PersistentMicrophone, SpeechEngine, VoiceConfig, VoiceController, VoiceUnavailable
 
@@ -59,7 +60,8 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                 self._json(HTTPStatus.OK, {
                     "version": __version__, "mode": "developer-preview", "local_timers": "ready",
                     "local_lists": "ready", "alarm_delivery": alarms.health() if alarms else {"status": "disabled"},
-                    "home_assistant": "not-configured", "codex": "not-configured",
+                    "home_assistant": router.home_assistant.health() if router.home_assistant else "not-configured",
+                    "codex": "configured" if router.answers else "not-configured",
                     "voice": voice.health(),
                 })
             elif path == "/api/timers":
@@ -192,7 +194,12 @@ def serve(port: int, store_path: Path) -> None:
     config = VoiceConfig.from_env()
     alarms = AlarmService(store, config.audio_output)
     alarms.start()
-    router = CommandRouter(store, alarm_available=lambda: alarms.health()["status"] == "ready")
+    # Owner configuration is deliberately outside the repository and disabled by default.
+    import os
+    ha_path = os.environ.get("ALLTRON_HA_CONFIG")
+    ha = HomeAssistant.from_file(Path(ha_path)) if ha_path else None
+    router = CommandRouter(store, alarm_available=lambda: alarms.health()["status"] == "ready",
+                           home_assistant=ha)
     microphone = PersistentMicrophone(config.audio_input) if config.audio_input else None
     if microphone:
         try:
@@ -203,7 +210,7 @@ def serve(port: int, store_path: Path) -> None:
     voice = VoiceController(microphone, engine, router)
     server = ThreadingHTTPServer(("127.0.0.1", port), handler_for(store, voice, alarms, router))
     print(f"Alltron developer preview: http://127.0.0.1:{server.server_port}")
-    print("Press Ctrl+C to stop. This preview does not control Home Assistant. Optional voice stays local.")
+    print("Press Ctrl+C to stop. Optional voice stays local; HA controls require explicit owner configuration.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

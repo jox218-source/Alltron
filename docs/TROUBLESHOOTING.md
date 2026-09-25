@@ -34,7 +34,7 @@ Voice is disabled by default. This preview needs a service-owned ALSA input, loc
 
 ## Account setup does not work
 
-The Home Assistant authorization flow and Codex CLI sign-in integration are not implemented. Speech and alarm adapters exist but have not passed live Pi acceptance. Do not share credentials or tokens to diagnose the project. Future setup diagnostics should report whether the issue is authorization, network access, account limits, or a service failure without printing credential contents.
+Guided Home Assistant authorization and Codex CLI sign-in integration are not implemented. The opt-in Home Assistant prototype reads a private token file and reports `not-allowed`, `auth-error`, `service-error` or `unavailable` without returning the token or raw server response. Check the owner config and token permissions locally; revoke a compromised token in Home Assistant. Speech and alarm adapters exist but have not passed live Pi acceptance. Do not share credentials or tokens to diagnose the project. Future setup diagnostics should distinguish authorization, network access, account limits and service failure without printing credential contents.
 
 ## How to report a future bug
 

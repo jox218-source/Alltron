@@ -1,0 +1,12 @@
+# Disposable Linux software test only. Set ALLTRON_TEST_HA_CONFIG to an empty
+# absolute directory outside this repository before running docker compose.
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ${ALLTRON_TEST_HA_CONFIG:?set an external disposable directory}:/config
+    ports:
+      - "127.0.0.1:8123:8123"
+    environment:
+      TZ: UTC
+    stop_grace_period: 60s

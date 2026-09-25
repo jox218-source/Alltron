@@ -23,14 +23,18 @@ docs/PRIVACY.md
 docs/PUBLICATION_GATE.md
 docs/PUBLIC_PATHS.txt
 docs/REUSE_CHECKLIST.md
+docs/STAGE2_DEVELOPMENT.md
 docs/STAGES.md
 docs/TROUBLESHOOTING.md
 docs/VOICE_DEVELOPMENT.md
 pyproject.toml
+dev/ha-compose.yaml
 src/alltron/__init__.py
 src/alltron/__main__.py
 src/alltron/alarms.py
+src/alltron/answers.py
 src/alltron/commands.py
+src/alltron/home_assistant.py
 src/alltron/server.py
 src/alltron/static/app.css
 src/alltron/static/app.js
@@ -39,6 +43,7 @@ src/alltron/timers.py
 src/alltron/voice.py
 tests/test_preview.py
 tests/test_local_core.py
+tests/test_owner_integrations.py
 tests/test_voice.py
 tests/test_publication_audit.py
 tools/publication_audit.py
