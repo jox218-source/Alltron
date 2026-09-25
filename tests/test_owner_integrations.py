@@ -101,9 +101,11 @@ class OwnerIntegrationTests(unittest.TestCase):
         result = router.execute("What is a light switch?")
         self.assertEqual(result["kind"], "answer")
         self.assertEqual(len(asked), 1)
+        self.assertEqual(router.execute("Why?")["kind"], "answer")
+        self.assertEqual(len(asked), 2)
         self.assertEqual(FakeHA.calls, [])
         self.assertEqual(router.execute("turn on the porch lamp")["kind"], "home-assistant")
-        self.assertEqual(len(asked), 1)
+        self.assertEqual(len(asked), 2)
 
     def test_loopback_api_reports_configuration_and_routes_selected_action(self):
         app = ThreadingHTTPServer(("127.0.0.1", 0), handler_for(self.router.store, router=self.router))

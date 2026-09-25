@@ -30,7 +30,7 @@ _COMPLETE_ITEM = re.compile(
 _SHOW_LIST = re.compile(r"(?:show|read|what(?:'s| is) on) (?:my |the )?shopping list", re.IGNORECASE)
 _TIME = re.compile(r"(?:what(?:'s| is) the time|what time is it|tell me the time|time)", re.IGNORECASE)
 _HA_ACTION = re.compile(r"(?:turn|switch) (on|off) (?:the )?(.+)", re.IGNORECASE)
-_QUESTION = re.compile(r"(?:what|when|where|who|why|how|which|is|are|can|could|do|does)\b.+", re.IGNORECASE)
+_QUESTION = re.compile(r"(?:what|when|where|who|why|how|which|is|are|can|could|do|does)\b.*", re.IGNORECASE)
 
 
 def _seconds(amount: str, unit: str) -> int:
