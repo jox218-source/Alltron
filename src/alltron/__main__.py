@@ -25,7 +25,7 @@ def main() -> None:
     if args.check:
         print(f"Python: {sys.version.split()[0]}")
         print(f"Data directory: {data_dir()}")
-        print("Mode: local developer preview (Home Assistant, Codex and audio not yet connected)")
+        print("Mode: local developer preview (Home Assistant and audio opt-in; Codex disabled)")
         return
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")

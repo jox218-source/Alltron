@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from typing import Callable
 
+from .answers import CodexAnswers
+from .home_assistant import HomeAssistant
 from .timers import TimerStore
 
 
@@ -27,7 +29,8 @@ _COMPLETE_ITEM = re.compile(
 )
 _SHOW_LIST = re.compile(r"(?:show|read|what(?:'s| is) on) (?:my |the )?shopping list", re.IGNORECASE)
 _TIME = re.compile(r"(?:what(?:'s| is) the time|what time is it|tell me the time|time)", re.IGNORECASE)
-_HA_ACTION = re.compile(r"(?:turn|switch) (?:on|off) .+", re.IGNORECASE)
+_HA_ACTION = re.compile(r"(?:turn|switch) (on|off) (?:the )?(.+)", re.IGNORECASE)
+_QUESTION = re.compile(r"(?:what|when|where|who|why|how|which|is|are|can|could|do|does)\b.+", re.IGNORECASE)
 
 
 def _seconds(amount: str, unit: str) -> int:
@@ -36,9 +39,12 @@ def _seconds(amount: str, unit: str) -> int:
 
 
 class CommandRouter:
-    def __init__(self, store: TimerStore, alarm_available: Callable[[], bool] | None = None):
+    def __init__(self, store: TimerStore, alarm_available: Callable[[], bool] | None = None,
+                 home_assistant: HomeAssistant | None = None, answers: CodexAnswers | None = None):
         self.store = store
         self.alarm_available = alarm_available or (lambda: False)
+        self.home_assistant = home_assistant
+        self.answers = answers
 
     def execute(self, text: str, *, request_id: str | None = None, now: float | None = None) -> dict:
         if not isinstance(text, str):
@@ -85,8 +91,12 @@ class CommandRouter:
         if _TIME.fullmatch(spoken):
             return {"kind": "time", "status": "ok",
                     "text": "It is " + datetime.fromtimestamp(timestamp).strftime("%I:%M %p").lstrip("0")}
-        if _HA_ACTION.fullmatch(spoken):
+        if match := _HA_ACTION.fullmatch(spoken):
+            if self.home_assistant:
+                return self.home_assistant.switch(match[2], match[1].lower() == "on")
             return {"kind": "home-assistant", "status": "not-configured",
                     "text": "Home Assistant controls are not connected yet."}
+        if _QUESTION.fullmatch(spoken) and self.answers:
+            return self.answers.answer(spoken)
         return {"kind": "unknown", "status": "unavailable",
                 "text": "I don't know that local command yet. General answers are not connected."}
