@@ -25,6 +25,8 @@ docs/PUBLIC_PATHS.txt
 docs/REUSE_CHECKLIST.md
 docs/RELEASE_BUILD.md
 docs/RELEASE_PATHS.txt
+docs/PREVIEW_INSTALL.md
+docs/PREVIEW_BACKUP.md
 docs/STAGE2_DEVELOPMENT.md
 docs/STAGES.md
 docs/TROUBLESHOOTING.md
@@ -49,5 +51,12 @@ tests/test_owner_integrations.py
 tests/test_voice.py
 tests/test_publication_audit.py
 tests/test_release_builder.py
+tests/test_preview_install.py
+tests/test_preview_backup.py
+tests/test_release_validation.py
 tools/publication_audit.py
 tools/build_release.py
+tools/__init__.py
+tools/preview_install.py
+tools/preview_backup.py
+tools/rehearse_preview.py

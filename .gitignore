@@ -28,6 +28,7 @@ config.private.json
 *.gif
 *.avif
 *.sqlite3
+*.sqlite3-*
 *.db3
 *.jsonl
 *.ipynb

@@ -4,6 +4,8 @@ Alltron is in pre-alpha. Entries describe development work, not verified Raspber
 
 ## 0.1.0a0 — Unreleased
 
+- Added bounded local SQLite snapshots, explicit restore with safety preservation, and data preservation before preview code updates/rollback. Recovery requires the exact source release and excludes accounts and Home Assistant data; migrations and appliance acceptance remain open.
+- Added local preview prerequisite checks, checksum-verified staging, disposable startup checks, managed startup and code rollback. Updates retain the selected version until the candidate passes; owner data stays separate. Appliance installation and data migration remain open.
 - Added a deterministic, allowlisted source preview builder and verifier with per-file SHA-256 manifest, dirty-tree and symlink rejection, synthetic tests, and CI build checks. This does not install or publish an appliance.
 - Added an opt-in owner-token Home Assistant light/switch allowlist prototype, a disposable container recipe, and a fake-tested Codex answer transport. Live HA and signed-in Codex acceptance remain open.
 - Moved wake, resident speech, live microphone/speaker checks and ARM64 voice acceptance to the separate-Pi Stage 4; Stage 2 HA/Codex owner integrations are the next software work.
