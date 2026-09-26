@@ -4,6 +4,7 @@ Alltron is in pre-alpha. Entries describe development work, not verified Raspber
 
 ## 0.1.0a0 — Unreleased
 
+- Added a deterministic, allowlisted source preview builder and verifier with per-file SHA-256 manifest, dirty-tree and symlink rejection, synthetic tests, and CI build checks. This does not install or publish an appliance.
 - Added an opt-in owner-token Home Assistant light/switch allowlist prototype, a disposable container recipe, and a fake-tested Codex answer transport. Live HA and signed-in Codex acceptance remain open.
 - Moved wake, resident speech, live microphone/speaker checks and ARM64 voice acceptance to the separate-Pi Stage 4; Stage 2 HA/Codex owner integrations are the next software work.
 - Documented PR #1's already-public squash-merge author-email exposure and limited the publication audit exception to that exact commit SHA; new commits still require no-reply identities.

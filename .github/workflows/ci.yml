@@ -42,3 +42,7 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Preflight
         run: python -m alltron --check
+      - name: Build and verify source preview
+        run: |
+          python tools/build_release.py --output-dir dist
+          python tools/build_release.py --verify dist/alltron-*-source.zip

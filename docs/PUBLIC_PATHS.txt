@@ -23,6 +23,8 @@ docs/PRIVACY.md
 docs/PUBLICATION_GATE.md
 docs/PUBLIC_PATHS.txt
 docs/REUSE_CHECKLIST.md
+docs/RELEASE_BUILD.md
+docs/RELEASE_PATHS.txt
 docs/STAGE2_DEVELOPMENT.md
 docs/STAGES.md
 docs/TROUBLESHOOTING.md
@@ -46,4 +48,6 @@ tests/test_local_core.py
 tests/test_owner_integrations.py
 tests/test_voice.py
 tests/test_publication_audit.py
+tests/test_release_builder.py
 tools/publication_audit.py
+tools/build_release.py
