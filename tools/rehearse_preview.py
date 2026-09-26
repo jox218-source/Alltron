@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -14,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-from .preview_install import InstallError, child_environment, initialize, install, status
+from .preview_install import InstallError, backup, backups, child_environment, initialize, install, restore, status
 
 
 def rehearse(archive: Path) -> None:
@@ -60,6 +62,13 @@ def rehearse(archive: Path) -> None:
                 assert "busy" in str(error)
             else:
                 raise AssertionError("Running preview did not retain its update lock")
+            for operation in (lambda: backup(root), lambda: restore(root, "0" * 32, replace_data=True)):
+                try:
+                    operation()
+                except InstallError as error:
+                    assert "busy" in str(error)
+                else:
+                    raise AssertionError("Running preview did not retain its data recovery lock")
         finally:
             if process.poll() is None:
                 process.terminate()
@@ -72,7 +81,16 @@ def rehearse(archive: Path) -> None:
         state_before = database.read_bytes()
         install(root, archive, digest)
         assert database.read_bytes() == state_before
-    print("PASS: actual archive install, repeat install, local run, update lock and unchanged owner state")
+        saved = backup(root)
+        with closing(sqlite3.connect(database)) as connection:
+            connection.execute("UPDATE timers SET label = 'Changed rehearsal'")
+            connection.commit()
+        recovered = restore(root, saved["id"], replace_data=True)
+        assert recovered["safety_backup"]["kind"] == "snapshot"
+        assert len(backups(root)["backups"]) == 2
+        with closing(sqlite3.connect(database)) as connection:
+            assert connection.execute("SELECT label FROM timers").fetchall() == [("Preview rehearsal",)]
+    print("PASS: actual archive install, local run, update/recovery locks, state preservation and backup/restore")
 
 
 def main() -> None:
