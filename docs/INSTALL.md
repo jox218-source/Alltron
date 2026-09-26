@@ -46,6 +46,10 @@ The preview binds only to `127.0.0.1`; it is not accessible to other devices on 
 
 This preview assumes a trusted, single-user computer. Other local processes may reach the loopback API; do not use it for sensitive household information on a shared machine.
 
+## Versioned developer preview
+
+The [preview release manager](PREVIEW_INSTALL.md) checks prerequisites, stages a checksum-verified source archive in a private local folder, tests it with disposable data, and offers managed startup and code rollback. Use this to rehearse software updates on a computer. It does not install Home Assistant, configure services/kiosk/audio, back up owner data, or establish Pi support. Keep the trusted archive checksum available and stop the managed preview before updating it.
+
 ## Planned owner setup
 
 The following sequence is a design target, not a working procedure:

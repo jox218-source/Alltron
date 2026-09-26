@@ -14,6 +14,7 @@ docs/PRIVACY.md
 docs/PUBLICATION_GATE.md
 docs/RELEASE_BUILD.md
 docs/RELEASE_PATHS.txt
+docs/PREVIEW_INSTALL.md
 docs/REUSE_CHECKLIST.md
 docs/STAGE2_DEVELOPMENT.md
 docs/STAGES.md
@@ -31,3 +32,6 @@ src/alltron/static/app.js
 src/alltron/static/index.html
 src/alltron/timers.py
 src/alltron/voice.py
+tools/__init__.py
+tools/build_release.py
+tools/preview_install.py

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
 import subprocess
+import stat
 import tempfile
 import tomllib
 import zipfile
@@ -22,6 +24,7 @@ MANIFEST = "RELEASE-MANIFEST.json"
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 MAX_FILE_BYTES = 256 * 1024
 MAX_MANIFEST_BYTES = 256 * 1024
+MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 
 
 class ReleaseError(Exception):
@@ -46,9 +49,21 @@ def release_paths(data: bytes) -> list[str]:
                 path != part.as_posix() or path.startswith("-") or
                 not re.fullmatch(r"[A-Za-z0-9_./-]+", path)):
             raise ReleaseError("Invalid release path")
+        for component in part.parts:
+            if component.endswith(".") or re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])", component.split(".")[0], re.I):
+                raise ReleaseError("Nonportable release path")
         paths.append(path)
-    if not paths or len(paths) != len(set(paths)) or MANIFEST in paths:
+    if not paths or len(paths) != len({path.casefold() for path in paths}) or MANIFEST.casefold() in {path.casefold() for path in paths}:
         raise ReleaseError("Release path list is empty or duplicated")
+    prefixes = {}
+    for path in paths:
+        components = PurePosixPath(path).parts
+        for length in range(1, len(components) + 1):
+            prefix = "/".join(components[:length])
+            key = prefix.casefold()
+            if key in prefixes and prefixes[key] != prefix:
+                raise ReleaseError("Release paths have conflicting capitalization")
+            prefixes[key] = prefix
     return sorted(paths)
 
 
@@ -125,35 +140,76 @@ def build_release(repo: Path, output_dir: Path) -> Path:
     return target
 
 
-def verify_release(archive_path: Path) -> dict:
+def read_archive_bytes(archive_path: Path) -> bytes:
+    with archive_path.open("rb") as stream:
+        data = stream.read(MAX_ARCHIVE_BYTES + 1)
+    if len(data) > MAX_ARCHIVE_BYTES:
+        raise ReleaseError("Archive exceeds size limit")
+    return data
+
+
+def verified_payloads(data: bytes) -> tuple[dict, dict[str, bytes]]:
+    """Validate a bounded immutable snapshot before any extraction or execution."""
     try:
-        with zipfile.ZipFile(archive_path) as archive:
+        if len(data) > MAX_ARCHIVE_BYTES:
+            raise ReleaseError("Archive exceeds size limit")
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
             infos = archive.infolist()
             names = [info.filename for info in infos]
-            if len(names) != len(set(names)) or names.count(MANIFEST) != 1:
+            if len(names) != len({name.casefold() for name in names}) or names.count(MANIFEST) != 1:
                 raise ReleaseError("Archive has duplicate or missing entries")
             if len(infos) > 100 or archive.getinfo(MANIFEST).file_size > MAX_MANIFEST_BYTES:
                 raise ReleaseError("Archive inventory exceeds limits")
             if any(info.file_size > MAX_FILE_BYTES for info in infos if info.filename != MANIFEST):
                 raise ReleaseError("Archive file exceeds limit")
+            for info in infos:
+                if (info.is_dir() or stat.S_IFMT(info.external_attr >> 16) not in (0, stat.S_IFREG)
+                        or info.flag_bits & 1 or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)):
+                    raise ReleaseError("Archive contains an unsupported entry")
             manifest = json.loads(archive.read(MANIFEST))
+            if not isinstance(manifest, dict) or set(manifest) != {"schema", "kind", "version", "commit", "files"}:
+                raise ReleaseError("Invalid archive manifest")
+            if (type(manifest["schema"]) is not int or manifest["schema"] != 1 or manifest["kind"] != "source-preview"
+                    or not isinstance(manifest["commit"], str) or not re.fullmatch(r"[0-9a-f]{40}", manifest["commit"])
+                    or not isinstance(manifest["version"], str)
+                    or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", manifest["version"])):
+                raise ReleaseError("Unsupported archive identity")
             entries = manifest["files"]
             if not isinstance(entries, list):
                 raise ReleaseError("Invalid archive manifest inventory")
+            for entry in entries:
+                if (not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size"}
+                        or not isinstance(entry["path"], str) or type(entry["size"]) is not int
+                        or not 0 <= entry["size"] <= MAX_FILE_BYTES or not isinstance(entry["sha256"], str)
+                        or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])):
+                    raise ReleaseError("Invalid archive file record")
             expected = [entry["path"] for entry in entries] + [MANIFEST]
             if sorted(names) != sorted(expected) or len(expected) != len(set(expected)):
                 raise ReleaseError("Archive inventory does not match manifest")
-            if manifest["schema"] != 1 or manifest["kind"] != "source-preview":
-                raise ReleaseError("Unsupported archive manifest")
+            payloads = {MANIFEST: archive.read(MANIFEST)}
             for entry in entries:
                 if release_paths(entry["path"].encode("utf-8")) != [entry["path"]]:
                     raise ReleaseError("Invalid archive path")
+                if any(str(parent).casefold() in {name.casefold() for name in names}
+                       for parent in PurePosixPath(entry["path"]).parents if str(parent) != "."):
+                    raise ReleaseError("Archive path conflicts with a directory")
                 payload = archive.read(entry["path"])
                 if len(payload) != entry["size"] or hashlib.sha256(payload).hexdigest() != entry["sha256"]:
                     raise ReleaseError("Archive file hash mismatch")
-            return manifest
-    except (OSError, zipfile.BadZipFile, KeyError, TypeError, ValueError) as exc:
+                payloads[entry["path"]] = payload
+            allowed = release_paths(payloads["docs/RELEASE_PATHS.txt"])
+            if allowed != sorted(entry["path"] for entry in entries):
+                raise ReleaseError("Archive inventory does not match source allowlist")
+            project = tomllib.loads(payloads["pyproject.toml"].decode("utf-8"))["project"]
+            if project["version"] != manifest["version"]:
+                raise ReleaseError("Archive version does not match project")
+            return manifest, payloads
+    except (OSError, zipfile.BadZipFile, KeyError, TypeError, ValueError, RuntimeError, NotImplementedError) as exc:
         raise ReleaseError("Invalid release archive") from exc
+
+
+def verify_release(archive_path: Path) -> dict:
+    return verified_payloads(read_archive_bytes(archive_path))[0]
 
 
 def main() -> None:

@@ -46,3 +46,5 @@ jobs:
         run: |
           python tools/build_release.py --output-dir dist
           python tools/build_release.py --verify dist/alltron-*-source.zip
+      - name: Rehearse local preview installation
+        run: python -m tools.rehearse_preview --archive dist/alltron-*-source.zip
