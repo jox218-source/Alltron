@@ -37,7 +37,7 @@ Alltron is designed so local household controls can continue when the answer ser
 
 ## Build order
 
-We are doing software implementation, simulation, setup design, and automated acceptance **before buying or using a dedicated test Pi**. Physical Pi validation is the last technical gate before beta. See [stages](docs/STAGES.md) and the [build plan](docs/BUILD_AND_RELEASE_PLAN.md). No result on the current household Pi is part of Alltron testing.
+We are finishing owner integrations while extending the source archive and local preview recovery into a disposable Linux installer **before buying or using a dedicated test Pi**. The separate-Pi validation remains the last technical gate before beta. See [stages](docs/STAGES.md) and the [build plan](docs/BUILD_AND_RELEASE_PLAN.md). No result on the current household Pi is part of Alltron testing.
 
 ## Contribute and get help
 

@@ -1,6 +1,6 @@
 # Public reuse checklist
 
-Evidence date: 2026-09-24. This is a sanitized feature and test checklist for Alltron. It records public implementation targets informed by a read-only review of a separate private prototype. It contains no private source, configuration, recordings, model assets or device details.
+Evidence date: 2026-09-26. This is a sanitized feature and test checklist for Alltron. It records public implementation targets informed by read-only reviews of separate private speech and full-release previews. It contains no private source, configuration, recordings, model assets or device details.
 
 | Area | Alltron contract | Acceptance evidence |
 | --- | --- | --- |
@@ -12,6 +12,9 @@ Evidence date: 2026-09-24. This is a sanitized feature and test checklist for Al
 | Speech engines | Resolve pinned upstream Whisper and Piper dependencies separately from app code and select models with recorded provenance. No engine or voice asset is included in this repository by default. | Dependency/license inventory, direct-worker spoken smoke, full-path spoken smoke and physical latency measurements. |
 | Home Assistant | Owner account and authorization, selected entity/action allowlist, verified state after writes. | Disposable HA tests; no real household identifiers in fixtures. |
 | General answers | Owner Codex CLI login in a restricted process; output is text only and cannot authorize a household action. | Fake CLI failure tests and disposable signed-in trial. |
+| Release artifact | Build from an explicit public file allowlist; record per-file hashes and a versioned release identity; leave secrets, state, models and personal media outside the archive. | Deterministic rebuild, inventory/hash audit, source-license review and rejected unapproved-path fixtures. |
 | Setup and recovery | Selected input/output devices, redacted status, repeatable install, backup, rollback and uninstall. | Clean disposable install and independent fresh-owner trial before beta. |
 
-The existing Alltron timer preview is the only application code reused directly. The private prototype provides behavior and failure-mode evidence only. Public code is authored in Alltron; third-party source and model licenses are checked before distribution. A separate, allowlisted Pi is required before any supported-hardware or ready-made claim.
+The existing Alltron preview is the only application code reused directly. The private previews provide behavior and failure-mode evidence only. Public code is authored in Alltron; third-party source and model licenses are checked before distribution. A separate, allowlisted Pi is required before any supported-hardware or ready-made claim.
+
+Open [PR #9](https://github.com/jox218-source/Alltron/pull/9) includes a deterministic source ZIP, exact path allowlist, per-file hashes, local preview staging/code rollback and application database backup/restore. These slices have synthetic and disposable local tests. They do not install a Pi appliance or HA, migrate data, guide an owner through setup or constitute release approval. The private preview's time-zone-sensitive Windows result remains a separate observation; it is not Alltron acceptance evidence.
