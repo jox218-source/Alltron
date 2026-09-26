@@ -19,8 +19,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 if __package__:
     from .build_release import ReleaseError, read_archive_bytes, verified_payloads
+    from . import preview_backup
 else:
     from build_release import ReleaseError, read_archive_bytes, verified_payloads
+    import preview_backup
 
 STATE = "installation.json"
 FORMAT = "alltron-preview-1"
@@ -85,6 +87,109 @@ def data_directory(root: Path) -> Path:
         if database.exists():
             regular_file(database)
     return data
+
+
+def backup_directory(root: Path, *, create: bool = False) -> Path:
+    folder = root / "backups"
+    local_path(folder)
+    if create:
+        folder.mkdir(mode=0o700, exist_ok=True)
+    if folder.exists():
+        if not folder.is_dir():
+            raise InstallError("The backup destination must be a private folder")
+        info = folder.stat()
+        if os.name == "posix" and (info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077):
+            raise InstallError("Use an owner-only backup folder with mode 0700")
+    return folder
+
+
+def no_database_sidecars(database: Path) -> None:
+    if any(database.with_name(database.name + suffix).exists() for suffix in ("-wal", "-shm", "-journal")):
+        raise InstallError("SQLite sidecars are present; close other database users and recover them before restoring")
+
+
+def snapshot_locked(root: Path, *, preserve_invalid: bool = False) -> dict:
+    state = load_state(root)
+    if not state["current"]:
+        raise InstallError("Install a preview archive before backing up its data")
+    database = data_directory(root) / "timers.sqlite3"
+    if not database.exists():
+        raise InstallError("No application database exists yet")
+    folder = backup_directory(root, create=True)
+    try:
+        return preview_backup.create_snapshot(database, folder, state["current"])
+    except preview_backup.InvalidDatabase:
+        if not preserve_invalid:
+            raise
+        no_database_sidecars(database)
+        return preview_backup.write_archive(folder, preview_backup.bounded_read(database),
+                                            state["current"], "preserved-original")
+
+
+def backup(root: Path) -> dict:
+    require_user()
+    with locked(root):
+        return snapshot_locked(root)
+
+
+def backups(root: Path) -> dict:
+    with locked(root):
+        folder = backup_directory(root)
+        result = []
+        if folder.exists():
+            for path in sorted(folder.glob("*.zip")):
+                regular_file(path)
+                metadata, _ = preview_backup.read_archive(path, path.stem)
+                result.append(metadata)
+        return {"backups": result}
+
+
+def restore(root: Path, identity: str, *, replace_data: bool = False) -> dict:
+    require_user()
+    if not replace_data:
+        raise InstallError("Restoring replaces application state; supply --replace-data to continue")
+    if not preview_backup.IDENTITY.fullmatch(identity):
+        raise InstallError("Choose a backup ID from the backups command")
+    with locked(root):
+        state = load_state(root)
+        path = backup_directory(root) / (identity + ".zip")
+        regular_file(path)
+        metadata, payload = preview_backup.read_archive(path, identity)
+        if metadata["kind"] != "snapshot":
+            raise InstallError("Preserved originals are recovery material, not validated restore snapshots")
+        if metadata["release_sha256"] != state["current"]:
+            raise InstallError("Select the exact release recorded by this backup before restoring")
+        release_on_disk(root, state["current"])
+        database = data_directory(root) / "timers.sqlite3"
+        no_database_sidecars(database)
+        with tempfile.NamedTemporaryFile(dir=database.parent, prefix=".restore-", delete=False) as stream:
+            pending = Path(stream.name)
+            try:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            except BaseException:
+                stream.close()
+                pending.unlink(missing_ok=True)
+                raise
+        try:
+            preview_backup.validate_database(pending)
+            safety = snapshot_locked(root, preserve_invalid=True) if database.exists() else None
+            # Read-only SQLite access can create WAL/SHM files for a WAL-mode
+            # main file. Never replace that main file while sidecars remain.
+            no_database_sidecars(database)
+            os.replace(pending, database)
+            preview_backup.sync_directory(database.parent)
+        finally:
+            pending.unlink(missing_ok=True)
+        return {"status": "restored", "backup_id": identity, "safety_backup": safety}
+
+
+def preserve_before_switch(root: Path, state: dict) -> dict | None:
+    database = data_directory(root) / "timers.sqlite3"
+    if state["current"] and database.exists():
+        return snapshot_locked(root, preserve_invalid=True)
+    return None
 
 
 def preflight(root: Path) -> dict:
@@ -321,9 +426,12 @@ def install(root: Path, archive: Path, expected: str) -> dict:
                         os.fsync(stream.fileno())
                 smoke_test(staged / "content", root)
                 os.replace(staged, destination)
+        safety = None
         if state["current"] != expected:
+            safety = preserve_before_switch(root, state)
             write_state(root, {"format": FORMAT, "current": expected, "previous": state["current"]})
-        return {"status": "installed", "version": manifest["version"], "commit": manifest["commit"], "archive_sha256": expected}
+        return {"status": "installed", "version": manifest["version"], "commit": manifest["commit"],
+                "archive_sha256": expected, "data_backup": safety}
 
 
 def rollback(root: Path) -> dict:
@@ -334,8 +442,9 @@ def rollback(root: Path) -> dict:
             raise InstallError("No previous release is available")
         content, manifest = release_on_disk(root, state["previous"])
         smoke_test(content, root)
+        safety = preserve_before_switch(root, state)
         write_state(root, {"format": FORMAT, "current": state["previous"], "previous": state["current"]})
-        return {"status": "rolled_back", "version": manifest["version"], "commit": manifest["commit"]}
+        return {"status": "rolled_back", "version": manifest["version"], "commit": manifest["commit"], "data_backup": safety}
 
 
 def status(root: Path) -> dict:
@@ -407,7 +516,7 @@ except (OSError, ValueError):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "preflight", "install", "status", "rollback", "run"):
+    for name in ("init", "preflight", "install", "status", "rollback", "run", "backup", "backups", "restore"):
         command = commands.add_parser(name)
         command.add_argument("--root", type=Path, required=True)
         if name == "install":
@@ -415,18 +524,24 @@ def main() -> None:
             command.add_argument("--sha256", required=True)
         if name == "run":
             command.add_argument("--port", type=int, default=8765)
+        if name == "restore":
+            command.add_argument("--backup", required=True)
+            command.add_argument("--replace-data", action="store_true")
     args = parser.parse_args()
     try:
         if args.command == "run":
             raise SystemExit(run(args.root, args.port))
         if args.command == "install":
             result = install(args.root, args.archive, args.sha256)
+        elif args.command == "restore":
+            result = restore(args.root, args.backup, replace_data=args.replace_data)
         else:
-            result = {"init": initialize, "preflight": preflight, "status": status, "rollback": rollback}[args.command](args.root)
+            result = {"init": initialize, "preflight": preflight, "status": status, "rollback": rollback,
+                      "backup": backup, "backups": backups}[args.command](args.root)
         print(json.dumps(result, sort_keys=True))
         if args.command == "preflight" and not result["ready"]:
             raise SystemExit(1)
-    except (InstallError, ReleaseError) as exc:
+    except (InstallError, ReleaseError, preview_backup.BackupError) as exc:
         parser.exit(1, f"Preview operation stopped: {exc}\n")
     except OSError:
         parser.exit(1, "Preview operation stopped: local storage or process operation failed; check permissions and available space\n")

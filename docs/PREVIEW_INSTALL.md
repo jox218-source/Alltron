@@ -68,10 +68,10 @@ python -m tools.preview_install rollback --root C:\AlltronPreview
 
 The managed run serves the preview on loopback. It disables Home Assistant, audio, and Codex regardless of ambient `ALLTRON` environment variables. Stop it with Ctrl+C. An exclusive process lock prevents install or rollback while a managed run is active. Atomic current/previous pointers support code rollback and retry after interrupted staging. The manager does not automatically remove old staging directories or prune releases.
 
-Application state is stored separately under `<root>/data`; the install smoke check uses disposable data. Rollback selects earlier code only. It does not undo database or other state changes made after running a version. Schema migrations are future work.
+Application state is stored separately under `<root>/data`; the install smoke check uses disposable data. Updates and code rollback preserve an existing database before switching code. Rollback selects earlier code only. Use the separate [backup and restore commands](PREVIEW_BACKUP.md) to restore a validated snapshot for the selected release. Schema migrations are future work.
 
 ## Scope and limitations
 
-This is local developer tooling. It does not install a service, kiosk, Home Assistant, Python, or appliance dependencies, and it does not establish Raspberry Pi or other hardware acceptance. It has no uninstall or backup workflow yet. Follow the existing [installation status and contributor setup](INSTALL.md) for the current preview's broader limitations.
+This is local developer tooling. It does not install a service, kiosk, Home Assistant, Python, or appliance dependencies, and it does not establish Raspberry Pi or other hardware acceptance. Uninstall and backups of Home Assistant or account data remain future work. Follow the existing [installation status and contributor setup](INSTALL.md) for the current preview's broader limitations.
 
 Interrupted staging may leave an inactive directory; repeating install verifies and reuses a fully staged release before switching the pointer. Power-loss durability and unattended service recovery remain acceptance work. This document does not announce a main-branch merge or public release.
