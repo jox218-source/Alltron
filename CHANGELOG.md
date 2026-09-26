@@ -4,6 +4,7 @@ Alltron is in pre-alpha. Entries describe development work, not verified Raspber
 
 ## 0.1.0a0 — Unreleased
 
+- Updated the remaining-stage roadmap after the private preview review: open PR #9 supplies only the Stage 3 source-archive slice; Linux time-zone and Alltron installer/recovery acceptance remain open.
 - Revised the remaining stages after a read-only private preview review: start clean public archive/install/rollback work alongside HA/Codex closeout; retain disposable integration, separate-Pi and beta gates.
 - Added an opt-in owner-token Home Assistant light/switch allowlist prototype, a disposable container recipe, and a fake-tested Codex answer transport. Live HA and signed-in Codex acceptance remain open.
 - Moved wake, resident speech, live microphone/speaker checks and ARM64 voice acceptance to the separate-Pi Stage 4; Stage 2 HA/Codex owner integrations are the next software work.

@@ -16,3 +16,5 @@ Evidence date: 2026-09-25. This is a sanitized feature and test checklist for Al
 | Setup and recovery | Selected input/output devices, redacted status, repeatable install, backup, rollback and uninstall. | Clean disposable install and independent fresh-owner trial before beta. |
 
 The existing Alltron preview is the only application code reused directly. The private previews provide behavior and failure-mode evidence only. Public code is authored in Alltron; third-party source and model licenses are checked before distribution. A separate, allowlisted Pi is required before any supported-hardware or ready-made claim.
+
+The release-artifact row has partial Alltron implementation evidence in open [PR #9](https://github.com/jox218-source/Alltron/pull/9): deterministic source ZIP, exact path allowlist, per-file hashes and synthetic rejection tests. It has no installer, rollback, owner data migration or release approval. The private preview's time-zone-sensitive Windows test result remains a separate observation; it is not Alltron acceptance evidence.
