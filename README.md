@@ -31,13 +31,13 @@ Open **http://127.0.0.1:8765** on the same computer. The preview serves a local 
 | Voice | Opt-in service-owned push-to-talk adapters, unverified with live audio; wake disabled | Local wake/push-to-talk, Whisper and speech output |
 | Alarms | Durable records and opt-in service tone; speaker behavior unverified | Verified service-owned playback and missed-alarm recovery |
 | General answers | Fake-tested answer adapter; running service has no login or answer calls | Optional owner Codex CLI login with isolated answer process |
-| Installer | Manual developer preview setup | Guided setup, diagnostics, backup and rollback |
+| Installer | [Local preview staging and rollback](docs/PREVIEW_INSTALL.md), [database recovery](docs/PREVIEW_BACKUP.md); appliance installer pending | Guided setup, diagnostics, backup and rollback |
 
 Alltron is designed so local household controls can continue when the answer service is unavailable. General questions sent to Codex will require network access and will leave the Pi. The exact data handling and offline guarantees must be verified before beta; see [privacy](docs/PRIVACY.md).
 
 ## Build order
 
-We are finishing owner integrations while starting the release builder, installer preflight and rollback work in parallel **before buying or using a dedicated test Pi**. The separate-Pi validation remains the last technical gate before beta. See [stages](docs/STAGES.md) and the [build plan](docs/BUILD_AND_RELEASE_PLAN.md). No result on the current household Pi is part of Alltron testing.
+We are finishing owner integrations while extending the source archive and local preview recovery into a disposable Linux installer **before buying or using a dedicated test Pi**. The separate-Pi validation remains the last technical gate before beta. See [stages](docs/STAGES.md) and the [build plan](docs/BUILD_AND_RELEASE_PLAN.md). No result on the current household Pi is part of Alltron testing.
 
 ## Contribute and get help
 

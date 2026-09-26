@@ -1,6 +1,6 @@
 # Public reuse checklist
 
-Evidence date: 2026-09-25. This is a sanitized feature and test checklist for Alltron. It records public implementation targets informed by read-only reviews of separate private speech and full-release previews. It contains no private source, configuration, recordings, model assets or device details.
+Evidence date: 2026-09-26. This is a sanitized feature and test checklist for Alltron. It records public implementation targets informed by read-only reviews of separate private speech and full-release previews. It contains no private source, configuration, recordings, model assets or device details.
 
 | Area | Alltron contract | Acceptance evidence |
 | --- | --- | --- |
@@ -17,4 +17,4 @@ Evidence date: 2026-09-25. This is a sanitized feature and test checklist for Al
 
 The existing Alltron preview is the only application code reused directly. The private previews provide behavior and failure-mode evidence only. Public code is authored in Alltron; third-party source and model licenses are checked before distribution. A separate, allowlisted Pi is required before any supported-hardware or ready-made claim.
 
-The release-artifact row has partial Alltron implementation evidence in open [PR #9](https://github.com/jox218-source/Alltron/pull/9): deterministic source ZIP, exact path allowlist, per-file hashes and synthetic rejection tests. It has no installer, rollback, owner data migration or release approval. The private preview's time-zone-sensitive Windows test result remains a separate observation; it is not Alltron acceptance evidence.
+Open [PR #9](https://github.com/jox218-source/Alltron/pull/9) includes a deterministic source ZIP, exact path allowlist, per-file hashes, local preview staging/code rollback and application database backup/restore. These slices have synthetic and disposable local tests. They do not install a Pi appliance or HA, migrate data, guide an owner through setup or constitute release approval. The private preview's time-zone-sensitive Windows result remains a separate observation; it is not Alltron acceptance evidence.
