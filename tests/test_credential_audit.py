@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 
@@ -23,6 +24,15 @@ class LocalCredentialAuditTests(unittest.TestCase):
         root = self.base / name
         root.mkdir()
         return root
+
+    @unittest.skipUnless(os.name == "posix", "Linux mount inventory only")
+    def test_rejects_a_mount_at_the_root_before_reading_files(self):
+        root = self.fixture_root("mount-root")
+        mount_row = f"1 0 0:1 / {root} rw - tmpfs tmpfs rw\n"
+        with mock.patch.object(Path, "read_text", return_value=mount_row):
+            problems, count = audit_local(root)
+        self.assertEqual(count, 0)
+        self.assertIn("Filesystem mount at or below audit root requires separate review", problems)
 
     def test_rejects_ignored_auth_and_profile_paths(self):
         root = self.fixture_root("ignored-paths")

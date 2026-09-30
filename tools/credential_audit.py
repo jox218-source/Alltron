@@ -1,6 +1,6 @@
 """Inspect local repository files, including ignored files, without following links.
 
-Reports categories and counts only. Never reads a developer's external auth cache.
+Reports categories and counts only; external auth caches are not audit inputs.
 This complements Git history review and archive verification, not a guarantee.
 """
 
@@ -121,15 +121,15 @@ def audit_local(root: Path) -> tuple[list[str], int]:
         return ["Audit root must be a real directory"], 0
     if os.name == "posix":
         # Linux bind mounts can have the same device number. Refuse any mount
-        # under the root as well as cross-device traversal; never inspect it.
+        # at/below the root as well as cross-device traversal; never inspect it.
         mounts = Path("/proc/self/mountinfo")
         if not mounts.is_file():
             return ["Mount inventory unavailable on this audit platform"], 0
         for row in mounts.read_text(encoding="utf-8").splitlines():
             import re
             mount = Path(re.sub(r"\\([0-7]{3})", lambda match: chr(int(match[1], 8)), row.split()[4]))
-            if root in mount.parents:
-                return ["Nested filesystem mount requires separate review"], 0
+            if mount == root or root in mount.parents:
+                return ["Filesystem mount at or below audit root requires separate review"], 0
         descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
             opened = os.fstat(descriptor)
