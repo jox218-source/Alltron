@@ -39,6 +39,7 @@ src/alltron/alarms.py
 src/alltron/answers.py
 src/alltron/commands.py
 src/alltron/home_assistant.py
+src/alltron/private_files.py
 src/alltron/server.py
 src/alltron/static/app.css
 src/alltron/static/app.js
@@ -60,3 +61,8 @@ tools/__init__.py
 tools/preview_install.py
 tools/preview_backup.py
 tools/rehearse_preview.py
+tools/credential_audit.py
+tests/test_credential_boundaries.py
+tests/test_credential_audit.py
+tests/test_http_bounds.py
+docs/SECURITY_REVIEW.md

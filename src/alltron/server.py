@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import socket
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -18,6 +20,34 @@ from .timers import TimerStore
 from .voice import PersistentMicrophone, SpeechEngine, VoiceConfig, VoiceController, VoiceUnavailable
 
 MAX_BODY = 4096
+MAX_CONNECTIONS = 8
+CONNECTION_DEADLINE = 10
+
+
+class PreviewHTTPServer(ThreadingHTTPServer):
+    """Bound concurrent handlers; loopback remains a trusted-user preview."""
+
+    daemon_threads = True
+
+    def __init__(self, *args, **kwargs):
+        self.slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.slots.release()
 
 
 def handler_for(store: TimerStore, voice: VoiceController | None = None,
@@ -27,6 +57,31 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "AlltronPreview/" + __version__
+
+        def setup(self):
+            self.request.settimeout(min(3, CONNECTION_DEADLINE))
+            super().setup()
+            def expire():
+                try:
+                    self.request.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                self.request.close()
+            self.deadline = threading.Timer(CONNECTION_DEADLINE, expire)
+            self.deadline.daemon = True
+            self.deadline.start()
+
+        def handle(self):
+            try:
+                super().handle()
+            except (ConnectionError, TimeoutError):
+                self.close_connection = True
+
+        def finish(self):
+            try:
+                super().finish()
+            finally:
+                self.deadline.cancel()
 
         def log_message(self, format: str, *args: object) -> None:
             # Do not log URL query strings or request bodies.
@@ -47,7 +102,7 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
 
         def _trusted_host(self) -> bool:
             expected = f"127.0.0.1:{self.server.server_port}"
-            if self.headers.get("Host") != expected:
+            if self.headers.get_all("Host") != [expected]:
                 self._json(HTTPStatus.FORBIDDEN, {"error": "Open Alltron at http://" + expected})
                 return False
             return True
@@ -99,19 +154,30 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                 return
             origin = self.headers.get("Origin")
             allowed_origin = f"http://127.0.0.1:{self.server.server_port}"
-            if origin != allowed_origin:
+            if origin != allowed_origin or self.headers.get_all("Origin") != [allowed_origin]:
                 self._json(HTTPStatus.FORBIDDEN, {"error": "Open Alltron at " + allowed_origin})
                 return
             if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
                 self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "Expected JSON"})
                 return
             try:
+                if self.headers.get("Transfer-Encoding") is not None or len(self.headers.get_all("Content-Length", [])) != 1:
+                    raise ValueError("Invalid request framing")
                 size = int(self.headers.get("Content-Length", "0"))
                 if not 0 < size <= MAX_BODY:
                     raise ValueError("Invalid request size")
                 payload = json.loads(self.rfile.read(size))
                 if not isinstance(payload, dict):
                     raise ValueError("Expected a JSON object")
+                fields = {
+                    "/api/timers": {"seconds", "label"}, "/api/timers/cancel": {"id"},
+                    "/api/alarms": {"due_at", "label"}, "/api/alarms/cancel": {"id"},
+                    "/api/lists/shopping": {"text"}, "/api/lists/shopping/complete": {"id"},
+                    "/api/commands": {"text", "request_id"}, "/api/voice/start": set(),
+                    "/api/voice/stop": {"request_id"}, "/api/voice/cancel": {"request_id"},
+                }
+                if set(payload) - fields[path]:
+                    raise ValueError("Unexpected request fields")
                 if path == "/api/timers":
                     seconds = payload.get("seconds")
                     if isinstance(seconds, bool) or not isinstance(seconds, int):
@@ -179,14 +245,16 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                     self._json(HTTPStatus.OK, {"cancelled": True})
             except VoiceUnavailable as exc:
                 self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": str(exc)})
-            except (ValueError, json.JSONDecodeError) as exc:
+            except (UnicodeError, json.JSONDecodeError):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON"})
+            except ValueError as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     return Handler
 
 
 def make_server(port: int, store_path: Path) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer(("127.0.0.1", port), handler_for(TimerStore(store_path)))
+    return PreviewHTTPServer(("127.0.0.1", port), handler_for(TimerStore(store_path)))
 
 
 def serve(port: int, store_path: Path) -> None:
@@ -208,7 +276,7 @@ def serve(port: int, store_path: Path) -> None:
             pass
     engine = SpeechEngine(config) if config.whisper_bin or config.piper_python else None
     voice = VoiceController(microphone, engine, router)
-    server = ThreadingHTTPServer(("127.0.0.1", port), handler_for(store, voice, alarms, router))
+    server = PreviewHTTPServer(("127.0.0.1", port), handler_for(store, voice, alarms, router))
     print(f"Alltron developer preview: http://127.0.0.1:{server.server_port}")
     print("Press Ctrl+C to stop. Optional voice stays local; HA controls require explicit owner configuration.")
     try:

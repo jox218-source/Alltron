@@ -2,7 +2,7 @@
 
 ## Project status
 
-Alltron is pre-alpha. It has not completed a security review and should not be treated as a hardened or safety-certified product. Do not expose its control interface to the public internet or use it for safety-critical functions.
+Alltron is pre-alpha. A scoped development review is recorded in [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md); deployment security acceptance remains open. Do not treat it as a hardened or safety-certified product, expose its control interface to the public internet or use it for safety-critical functions.
 
 The current timer preview assumes a trusted, single-user computer. Its loopback API has no account authentication; other local users or processes on a shared computer may be able to reach it. Use a dedicated account/device and avoid sensitive timer labels until local authorization is implemented.
 
@@ -18,7 +18,7 @@ Include the affected revision, impact, reproduction steps using a fictional or i
 
 ## Security expectations
 
-- Store credentials only in local, ignored configuration or the operating system's secret store; never in source control or logs.
+- Store credentials outside the repository in a dedicated owner-private profile or operating system secret store; never in source control, artifacts or logs. Ignoring a file does not make it an approved credential location.
 - Grant Home Assistant only the access needed for the configured features.
 - Treat transcripts, audio, entity names, prompts, and CLI output as sensitive household data.
 - Keep control interfaces on a trusted local network and document any listening address or firewall change.

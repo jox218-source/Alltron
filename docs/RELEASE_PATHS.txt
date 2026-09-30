@@ -11,6 +11,7 @@ docs/ARCHITECTURE.md
 docs/BUILD_AND_RELEASE_PLAN.md
 docs/INSTALL.md
 docs/PRIVACY.md
+docs/SECURITY_REVIEW.md
 docs/PUBLICATION_GATE.md
 docs/RELEASE_BUILD.md
 docs/RELEASE_PATHS.txt
@@ -27,6 +28,7 @@ src/alltron/alarms.py
 src/alltron/answers.py
 src/alltron/commands.py
 src/alltron/home_assistant.py
+src/alltron/private_files.py
 src/alltron/server.py
 src/alltron/static/app.css
 src/alltron/static/app.js
