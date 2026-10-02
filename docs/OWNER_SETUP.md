@@ -21,13 +21,28 @@ Start Alltron in owner mode:
 alltron --owner-profile /absolute/private/profile/owner.json
 ```
 
-Open the exact `https://127.0.0.1:<port>` URL printed by the process, on the same device. The default port is `8765`; keep the service bound to loopback. The browser login uses the local Alltron password. Before entering it, inspect the browser's HTTPS certificate and compare its SHA-256 fingerprint with the generated profile certificate:
+Open the exact `https://127.0.0.1:<port>` URL printed by the process, on the same device. The default port is `8765`; keep the service bound to loopback. The browser login uses the local Alltron password. Before entering it, inspect the browser's HTTPS certificate and compare its SHA-256 fingerprint with the active certificate reported by the owner CLI:
 
 ```sh
-openssl x509 -in /absolute/private/profile/alltron.crt -noout -fingerprint -sha256
+python -m alltron.setup --profile /absolute/private/profile --certificate-info
 ```
 
-Trust only that generated certificate after the fingerprint matches exactly. Use the browser or operating system's certificate trust controls for that certificate. If the fingerprint differs, the certificate is missing, or the browser cannot establish the expected identity, stop and resolve the discrepancy. Do not bypass a certificate warning blindly or accept a different identity to continue.
+The command prints the active certificate path and SHA-256 fingerprint from `owner.json`. The initial path is usually `alltron.crt`; after rotation it is under a generated `tls-*` directory. Use the printed active path and fingerprint instead of assuming a certificate filename. Trust only that certificate after the browser fingerprint matches exactly. Use the browser or operating system's certificate trust controls for it. If the fingerprint differs, the certificate is missing, or the browser cannot establish the expected identity, stop and resolve the discrepancy. Do not bypass a certificate warning blindly or accept a different identity to continue.
+
+### Rotate the local Alltron certificate
+
+Certificate rotation is available to an ordinary Linux owner with the dedicated private profile. Stop Alltron first. If systemd user units are installed, use `uninstall-services` as described in [Linux services](LINUX_SERVICES.md); that checks and stops the exact generated units before removing them. Then run:
+
+```sh
+python -m alltron.setup --profile /absolute/private/profile --rotate-certificate
+python -m alltron.setup --profile /absolute/private/profile --certificate-info
+```
+
+Rotation takes the profile's setup lock, generates and validates a new private TLS pair in a private generation directory, and atomically updates `owner.json` to point at it. It preserves the local password hash and old TLS files. Existing web sessions are revoked; restart Alltron for the new certificate to take effect. Compare the browser's certificate fingerprint with the new `--certificate-info` value, then trust only that new identity. Trust stores are not updated automatically; remove the old certificate trust and add the new one through the browser or operating system's certificate controls as appropriate.
+
+For service-managed installs, re-run `prepare` and `install-services` with the same managed root, profile and dedicated HA data root after rotating the certificate. `activate` remains gated; do not start the units manually to bypass it. This operation rotates only Alltron's HTTPS certificate. It does not rotate Home Assistant's certificate or change HA trust, and no HA certificate rotation has been accepted.
+
+To change the local owner password, stop Alltron and run `python -m alltron.setup --profile /absolute/private/profile --reset-password`. Enter and repeat the new password at the terminal prompt; never pass it in an argument. This serialized profile update preserves certificate settings, revokes existing sessions, and requires an Alltron restart.
 
 ## Authorize Home Assistant
 
@@ -47,7 +62,7 @@ The local Alltron password is verified by the local Alltron service. Home Assist
 
 ## Reported disposable lab observations
 
-The lead reports a partial Ubuntu 24.04 WSL2 trial at public source revision `bf7b388`: verified local TLS and locked API, CSRF rejection, fictional device selection and virtual on/off, refusal of an unknown entity, refresh-token expiry handling, bounded Home Assistant offline failure while local timers remained usable, retained authorization after that failure, service stop/restart recovery, and logout returning HTTP 401 for the prior session. A Home Assistant revoke endpoint returned HTTP 200 and the old trial token subsequently returned HTTP 401; the UI and docs now treat the 200 as a request only, not general confirmation. Eight headless service lifecycle checks also reportedly covered activation refusal, database restore, checksum rejection, rollback/state preservation, repeat preparation, service start after update, and exact-unit uninstall. These are lead-reported observations, not independent VM acceptance. The trial did not establish fresh browser certificate trust, certificate rotation, WSL reboot behavior, Codex sign-in, or hardware support.
+The lead reports a partial Ubuntu 24.04 WSL2 trial at public source revision `bf7b388`: verified local TLS and locked API, CSRF rejection, fictional device selection and virtual on/off, refusal of an unknown entity, refresh-token expiry handling, bounded Home Assistant offline failure while local timers remained usable, retained authorization after that failure, service stop/restart recovery, and logout returning HTTP 401 for the prior session. A Home Assistant revoke endpoint returned HTTP 200 and the old trial token subsequently returned HTTP 401; the UI and docs now treat the 200 as a request only, not general confirmation. Eight headless service lifecycle checks also reportedly covered activation refusal, database restore, checksum rejection, rollback/state preservation, repeat preparation, service start after update, and exact-unit uninstall. These are lead-reported observations, not independent VM acceptance. The trial did not establish fresh browser certificate trust, exercise the newer local app-certificate rotation command, test Home Assistant certificate rotation, test WSL reboot behavior, perform Codex sign-in, or validate hardware support.
 
 ## Preview mode and unavailable features
 

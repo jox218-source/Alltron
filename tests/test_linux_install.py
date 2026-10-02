@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import shutil
 import sys
 import tempfile
@@ -34,8 +35,9 @@ class LinuxInstallTests(unittest.TestCase):
         profile = self.temp / "fictional-owner-profile"
         profile.mkdir(mode=0o700)
         cert, key = make_certificate(profile, "alltron")
+        self.profile_password = secrets.token_urlsafe(24)
         profile.joinpath("owner.json").write_text(json.dumps({
-            "format": "alltron-owner-1", **password_record("fictional-linux-test-passphrase"),
+            "format": "alltron-owner-1", **password_record(self.profile_password),
             "certificate": str(cert), "private_key": str(key),
         }), encoding="utf-8")
         profile.joinpath("owner.json").chmod(0o600)
@@ -109,6 +111,8 @@ class LinuxInstallTests(unittest.TestCase):
                          "Linux preparation requires Linux and OpenSSL")
     def test_prepare_writes_restricted_units_and_does_not_start_services(self):
         root, profile, ha_root, content = self._prepared_environment()
+        owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+        active_certificate_info = owner_setup.certificate_info(profile)
         manifest = {"version": "0.1.0-fictional"}
         real_run = linux_install.subprocess.run
         with (mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
@@ -142,34 +146,188 @@ class LinuxInstallTests(unittest.TestCase):
         self.assertTrue((ha_root / "ha.crt").is_file())
         self.assertTrue((ha_root / "ha.key").is_file())
         self.assertTrue((ha_root / "ha.key").read_text(encoding="utf-8").startswith("-----BEGIN "))
+        self.assertEqual(result["certificate_sha256"]["alltron.crt"], active_certificate_info["sha256"])
 
-    @unittest.skipUnless(OPENSSL and os.name == "posix", "POSIX owner enrollment requires OpenSSL")
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux owner enrollment requires OpenSSL")
     def test_enrollment_creates_valid_tls_profile_and_repeat_preserves_it(self):
         if os.geteuid() == 0:
             self.skipTest("Owner enrollment intentionally refuses root")
         profile = self.temp / "enrolled-profile"
-        result = owner_setup.enroll(profile, "fictional-enrollment-passphrase", openssl=OPENSSL)
+        password = secrets.token_urlsafe(24)
+        result = owner_setup.enroll(profile, password, openssl=OPENSSL)
         self.assertEqual(result["status"], "enrolled")
         auth = OwnerAuth(profile / "owner.json")
         context = auth.context()
         self.assertEqual(context.minimum_version.name, "TLSv1_2")
         cert_before = (profile / "alltron.crt").read_bytes()
         key_before = (profile / "alltron.key").read_bytes()
-        self.assertEqual(owner_setup.enroll(profile, "different-fictional-passphrase", openssl=OPENSSL)["status"],
+        self.assertEqual(owner_setup.enroll(profile, secrets.token_urlsafe(24), openssl=OPENSSL)["status"],
                          "already-enrolled")
         self.assertEqual((profile / "alltron.crt").read_bytes(), cert_before)
         self.assertEqual((profile / "alltron.key").read_bytes(), key_before)
 
-    @unittest.skipUnless(os.name == "posix", "POSIX enrollment boundary")
+    @unittest.skipUnless(sys.platform == "linux" and os.name == "posix", "Linux enrollment boundary")
     def test_openssl_failure_leaves_no_published_profile(self):
         if os.geteuid() == 0:
             self.skipTest("Owner enrollment intentionally refuses root")
         profile = self.temp / "failed-enrollment"
         with mock.patch.object(owner_setup.subprocess, "run", return_value=mock.Mock(returncode=1)):
             with self.assertRaisesRegex(ValueError, "TLS generation failed"):
-                owner_setup.enroll(profile, "fictional-enrollment-passphrase", openssl=OPENSSL or "/fake/openssl")
+                owner_setup.enroll(profile, secrets.token_urlsafe(24), openssl=OPENSSL or "/fake/openssl")
         self.assertFalse(profile.exists())
         self.assertFalse(list(self.temp.glob(".alltron-enroll-*")))
+
+    def _enrolled_rotation_profile(self):
+        profile = self.temp / "fictional-rotation-profile"
+        password = secrets.token_urlsafe(24)
+        owner_setup.enroll(profile, password, openssl=OPENSSL)
+        return profile, password
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux certificate rotation requires OpenSSL")
+    def test_rotation_changes_fingerprint_preserves_password_and_revokes_old_session(self):
+        if os.geteuid() == 0:
+            self.skipTest("Certificate rotation requires an ordinary Linux user")
+        profile, password = self._enrolled_rotation_profile()
+        old_auth = OwnerAuth(profile / "owner.json")
+        old_hash = old_auth.data["password_hash"]
+        old_certificate = Path(old_auth.data["certificate"])
+        old_key = Path(old_auth.data["private_key"])
+        old_cert_bytes, old_key_bytes = old_certificate.read_bytes(), old_key.read_bytes()
+        old_info = owner_setup.certificate_info(profile)
+        cookie = old_auth.login(password).split(";", 1)[0]
+        self.assertTrue(old_auth.authorized(cookie))
+
+        result = owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+
+        new_auth = OwnerAuth(profile / "owner.json")
+        new_info = owner_setup.certificate_info(profile)
+        new_auth.context()
+        self.assertEqual(result["status"], "certificate-rotated")
+        self.assertNotEqual(new_info["sha256"], old_info["sha256"])
+        self.assertEqual(new_auth.data["password_hash"], old_hash)
+        self.assertEqual(old_certificate.read_bytes(), old_cert_bytes)
+        self.assertEqual(old_key.read_bytes(), old_key_bytes)
+        self.assertFalse(old_auth.authorized(cookie))
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux certificate rotation requires OpenSSL")
+    def test_rotation_generation_failure_preserves_marker_and_old_tls_pair(self):
+        if os.geteuid() == 0:
+            self.skipTest("Certificate rotation requires an ordinary Linux user")
+        profile, _ = self._enrolled_rotation_profile()
+        marker = (profile / "owner.json").read_bytes()
+        auth = OwnerAuth(profile / "owner.json")
+        cert = Path(auth.data["certificate"])
+        key = Path(auth.data["private_key"])
+        old_pair = cert.read_bytes(), key.read_bytes()
+        with mock.patch.object(owner_setup.subprocess, "run", return_value=mock.Mock(returncode=1)):
+            with self.assertRaisesRegex(ValueError, "TLS generation failed"):
+                owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+        self.assertEqual((profile / "owner.json").read_bytes(), marker)
+        self.assertEqual((cert.read_bytes(), key.read_bytes()), old_pair)
+        self.assertFalse(list(profile.glob("tls-*")))
+        self.assertFalse(list(profile.glob(".rotate-*")))
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux certificate rotation requires OpenSSL")
+    def test_marker_write_failure_removes_only_new_pair_and_preserves_old_profile(self):
+        if os.geteuid() == 0:
+            self.skipTest("Certificate rotation requires an ordinary Linux user")
+        profile, _ = self._enrolled_rotation_profile()
+        marker = (profile / "owner.json").read_bytes()
+        auth = OwnerAuth(profile / "owner.json")
+        cert = Path(auth.data["certificate"])
+        key = Path(auth.data["private_key"])
+        old_pair = cert.read_bytes(), key.read_bytes()
+        real_write = owner_setup.private_write
+
+        def fail_marker_write(path, data):
+            if Path(path) == profile / "owner.json":
+                raise OSError("fictional marker publication failure")
+            return real_write(path, data)
+
+        with mock.patch.object(owner_setup, "private_write", side_effect=fail_marker_write):
+            with self.assertRaisesRegex(OSError, "publication failure"):
+                owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+        self.assertEqual((profile / "owner.json").read_bytes(), marker)
+        self.assertEqual((cert.read_bytes(), key.read_bytes()), old_pair)
+        self.assertFalse(list(profile.glob("tls-*")))
+        self.assertFalse(list(profile.glob(".rotate-*")))
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux certificate rotation requires OpenSSL")
+    def test_post_replace_fault_keeps_marker_targeted_valid_pair(self):
+        if os.geteuid() == 0:
+            self.skipTest("Certificate rotation requires an ordinary Linux owner")
+        profile, _ = self._enrolled_rotation_profile()
+        old_auth = OwnerAuth(profile / "owner.json")
+        old_marker = old_auth.raw
+        old_certificate = Path(old_auth.data["certificate"])
+        old_key = Path(old_auth.data["private_key"])
+        old_pair = old_certificate.read_bytes(), old_key.read_bytes()
+        real_write = owner_setup.private_write
+
+        def write_then_fail_marker(path, data):
+            result = real_write(path, data)
+            if Path(path) == profile / "owner.json":
+                raise OSError("fictional post-replace sync failure")
+            return result
+
+        with mock.patch.object(owner_setup, "private_write", side_effect=write_then_fail_marker):
+            with self.assertRaisesRegex(OSError, "post-replace"):
+                owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+
+        current = OwnerAuth(profile / "owner.json")
+        current.context()
+        new_certificate = Path(current.data["certificate"])
+        new_key = Path(current.data["private_key"])
+        self.assertNotEqual(current.raw, old_marker)
+        self.assertTrue(new_certificate.is_file())
+        self.assertTrue(new_key.is_file())
+        self.assertNotEqual(new_certificate, old_certificate)
+        self.assertNotEqual(new_certificate.read_bytes(), old_pair[0])
+        self.assertEqual(old_certificate.read_bytes(), old_pair[0])
+        self.assertEqual(old_key.read_bytes(), old_pair[1])
+        self.assertTrue(new_certificate.parent.is_dir())
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux preparation lock requires OpenSSL")
+    def test_contended_profile_lock_stops_prepare_before_writes(self):
+        if os.geteuid() == 0:
+            self.skipTest("Profile lock requires an ordinary Linux owner")
+        root, profile, ha_root, _content = self._prepared_environment()
+        with owner_setup.profile_lock(profile):
+            marker = (profile / "owner.json").read_bytes()
+            entries = {item.name for item in profile.iterdir()}
+            with mock.patch.object(linux_install, "_prepare") as prepare:
+                with self.assertRaises(OSError):
+                    linux_install.prepare(root, profile, ha_root)
+            prepare.assert_not_called()
+            self.assertEqual((profile / "owner.json").read_bytes(), marker)
+            self.assertEqual({item.name for item in profile.iterdir()}, entries)
+            self.assertFalse(ha_root.exists())
+
+    @unittest.skipUnless(OPENSSL and sys.platform == "linux" and os.name == "posix",
+                         "Linux profile lock requires OpenSSL")
+    def test_concurrent_profile_lock_refuses_rotation_without_changes(self):
+        if os.geteuid() == 0:
+            self.skipTest("Profile lock requires an ordinary Linux user")
+        profile, _ = self._enrolled_rotation_profile()
+        marker = (profile / "owner.json").read_bytes()
+        auth = OwnerAuth(profile / "owner.json")
+        cert = Path(auth.data["certificate"])
+        key = Path(auth.data["private_key"])
+        old_pair = cert.read_bytes(), key.read_bytes()
+        with owner_setup.profile_lock(profile):
+            with mock.patch.object(owner_setup.subprocess, "run") as run:
+                with self.assertRaises(OSError):
+                    owner_setup.rotate_certificate(profile, openssl=OPENSSL)
+            run.assert_not_called()
+        self.assertEqual((profile / "owner.json").read_bytes(), marker)
+        self.assertEqual((cert.read_bytes(), key.read_bytes()), old_pair)
+        self.assertFalse(list(profile.glob("tls-*")))
 
     def test_overlapping_roots_are_rejected_before_archive_or_service_work(self):
         root = self.temp / "fictional-app"

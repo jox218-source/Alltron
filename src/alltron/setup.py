@@ -3,16 +3,30 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import getpass
+import hashlib
 import json
 import os
 import shutil
+import secrets
+import ssl
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
 
 from .owner import OwnerAuth, password_record
 from .private_files import checked_path, read_private_text
+
+
+def sync_directory(path: Path) -> None:
+    if os.name == "posix":
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
 
 def private_write(path: Path, data: str) -> None:
@@ -28,6 +42,7 @@ def private_write(path: Path, data: str) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        sync_directory(path.parent)
     finally:
         if Path(temporary).exists():
             Path(temporary).unlink()
@@ -86,23 +101,113 @@ def enroll(root: Path, password: str, *, openssl: str) -> dict:
     return {"status": "enrolled"}
 
 
+def certificate_info(root: Path) -> dict:
+    auth = OwnerAuth(root / "owner.json")
+    auth.context()
+    cert = Path(auth.data["certificate"])
+    fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(read_private_text(cert, 16384))).hexdigest()
+    if read_private_text(root / "owner.json", 16384) != auth.raw:
+        raise ValueError("Owner profile changed; retry certificate information")
+    return {"certificate": str(cert), "sha256": fingerprint}
+
+
+@contextmanager
+def profile_lock(root: Path):
+    if os.name != "posix" or os.geteuid() == 0:
+        raise ValueError("Profile changes require an ordinary Linux owner")
+    if not root.is_absolute() or ".." in root.parts or root == Path.home() or root == Path(root.anchor):
+        raise ValueError("Use a dedicated private owner profile")
+    checked_path(root, directory=True)
+    if root.stat().st_uid != os.geteuid() or root.stat().st_mode & 0o077:
+        raise ValueError("Use an owner-only profile")
+    import fcntl
+    path = root / ".setup.lock"
+    if path.exists() or path.is_symlink():
+        read_private_text(path, 1024)
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "r+b") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise ValueError("Unsafe setup lock")
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            yield
+        finally:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def rotate_certificate(root: Path, *, openssl: str) -> dict:
+    with profile_lock(root):
+        return _rotate_certificate(root, openssl=openssl)
+
+
+def _rotate_certificate(root: Path, *, openssl: str) -> dict:
+    """Publish a validated TLS pair by changing only the atomic owner marker."""
+    if os.name != "posix" or os.geteuid() == 0:
+        raise ValueError("Certificate rotation requires an ordinary Linux owner")
+    if not root.is_absolute() or ".." in root.parts or root == Path.home() or root == Path(root.anchor):
+        raise ValueError("Use the dedicated private owner profile")
+    checked_path(root, directory=True)
+    auth = OwnerAuth(root / "owner.json")
+    # The old certificate may have expired; validate its files without requiring
+    # a network handshake so renewal remains possible.
+    auth.context()
+    target = root / ("tls-" + secrets.token_hex(16))
+    with tempfile.TemporaryDirectory(dir=root, prefix=".rotate-") as staging:
+        pending = Path(staging) / "profile"
+        pending.mkdir(mode=0o700)
+        cert, key = certificate(pending, "alltron", openssl)
+        private_write(pending / "owner.json", json.dumps({**auth.data, "certificate": str(cert), "private_key": str(key)}))
+        OwnerAuth(pending / "owner.json").context()
+        (pending / "owner.json").unlink()
+        pending.rename(target)
+        sync_directory(root)
+        try:
+            private_write(root / "owner.json", json.dumps({**auth.data, "certificate": str(target / cert.name),
+                                                           "private_key": str(target / key.name)}))
+        except BaseException:
+            # Publication may have succeeded before an fsync/interruption failed.
+            # Remove only when the unchanged old marker is positively verified.
+            try:
+                old_marker_active = read_private_text(root / "owner.json", 16384) == auth.raw
+            except (OSError, ValueError):
+                old_marker_active = False
+            if old_marker_active:
+                for name in (cert.name, key.name):
+                    (target / name).unlink()
+                target.rmdir()
+            raise
+    return {"status": "certificate-rotated", **certificate_info(root)}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
-    parser.add_argument("--reset-password", action="store_true")
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument("--reset-password", action="store_true")
+    operation.add_argument("--rotate-certificate", action="store_true")
+    operation.add_argument("--certificate-info", action="store_true")
     args = parser.parse_args()
     try:
+        if args.certificate_info:
+            print(json.dumps(certificate_info(args.profile), sort_keys=True))
+            return
         if args.reset_password:
-            auth = OwnerAuth(args.profile / "owner.json")
-            password = getpass.getpass("New local Alltron password (12+ characters): ")
-            if password != getpass.getpass("Repeat password: "):
-                raise ValueError("Passwords did not match")
-            private_write(args.profile / "owner.json", json.dumps({**auth.data, **password_record(password)}))
+            with profile_lock(args.profile):
+                auth = OwnerAuth(args.profile / "owner.json")
+                password = getpass.getpass("New local Alltron password (12+ characters): ")
+                if password != getpass.getpass("Repeat password: "):
+                    raise ValueError("Passwords did not match")
+                private_write(args.profile / "owner.json", json.dumps({**auth.data, **password_record(password)}))
             print("Password changed; existing sessions are revoked. Restart Alltron.")
             return
         openssl = shutil.which("openssl")
         if not openssl:
             raise ValueError("Install OpenSSL before local owner setup")
+        if args.rotate_certificate:
+            print(json.dumps(rotate_certificate(args.profile, openssl=openssl), sort_keys=True))
+            print("Restart Alltron and verify the new certificate fingerprint before trusting it. Existing sessions are revoked.")
+            return
         if (args.profile / "owner.json").exists():
             OwnerAuth(args.profile / "owner.json").context()
             print("Owner setup already exists; password and certificates preserved.")

@@ -76,12 +76,26 @@ def local_podman() -> tuple[list[str], dict[str, str]]:
 
 def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_port: int = 8123) -> dict:
     user()
-    checked, read, write, certificate, OwnerAuth = modules()
+    separate_roots(root, profile, ha_root)
+    modules()
+    safe_path(profile)
+    from alltron.setup import profile_lock
+    with profile_lock(profile):
+        return _prepare(root, profile, ha_root, port=port, ha_port=ha_port)
+
+
+def separate_roots(root: Path, profile: Path, ha_root: Path) -> None:
     roots = tuple(safe_path(path) for path in (root, profile, ha_root))
     for i, left in enumerate(roots):
         for right in roots[i + 1:]:
             if left == right or left in right.parents or right in left.parents:
                 raise ValueError("Use separate application, owner and HA directories")
+
+
+def _prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_port: int = 8123) -> dict:
+    user()
+    checked, read, write, certificate, OwnerAuth = modules()
+    separate_roots(root, profile, ha_root)
     if (isinstance(port, bool) or isinstance(ha_port, bool) or not isinstance(port, int)
             or not isinstance(ha_port, int) or not 1 <= port <= 65535 or not 1 <= ha_port <= 65535 or port == ha_port):
         raise ValueError("Choose different valid loopback ports")
@@ -179,8 +193,9 @@ WantedBy=default.target
         write(profile / "services.json", json.dumps({"format": "alltron-services-1", "root": str(root),
                                                      "ha_root": str(ha_root), "archive": state["current"],
                                                      "port": port, "ha_port": ha_port}))
-        fingerprints = {name: hashlib.sha256(__import__("ssl").PEM_cert_to_DER_cert(read(profile / name, 16384))).hexdigest()
-                        for name in ("alltron.crt", "ha-ca.crt")}
+        active_certificate = Path(OwnerAuth(profile / "owner.json").data["certificate"])
+        fingerprints = {name: hashlib.sha256(__import__("ssl").PEM_cert_to_DER_cert(read(path, 16384))).hexdigest()
+                        for name, path in (("alltron.crt", active_certificate), ("ha-ca.crt", profile / "ha-ca.crt"))}
         return {"status": "prepared", "version": manifest["version"], "certificate_sha256": fingerprints,
                 "services_started": False, "ha_image": HA_IMAGE, "codex_enabled": False}
 

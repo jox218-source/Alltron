@@ -272,8 +272,9 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                         router.home_assistant = ha_setup.select(payload.get("aliases"))
                         result = ha_setup.status()
                     else:
-                        result = ha_setup.disconnect() if path.endswith("/disconnect") else ha_setup.revoke()
+                        # A failed/partial cleanup must never leave a live adapter.
                         router.home_assistant = None
+                        result = ha_setup.disconnect() if path.endswith("/disconnect") else ha_setup.revoke()
                     self._json(HTTPStatus.OK, result)
                 elif path == "/api/login":
                     if auth is None:

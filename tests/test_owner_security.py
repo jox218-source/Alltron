@@ -13,6 +13,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPSHandler, HTTPCookieProcessor, Request, build_opener
 
@@ -160,6 +161,44 @@ class OwnerSecurityTests(unittest.TestCase):
         self.assertEqual(status, 200, body)
         self.assertEqual(json.loads(body)["home_assistant"], "needs-authorization")
         self.assertEqual(self.ha_setup.pending, {})
+        self.assertTrue(all(not (self.root / name).exists() for name in names))
+        self.assertIsNone(self.router.home_assistant)
+
+    def test_partial_ha_disconnect_failure_keeps_adapter_disabled_and_can_retry(self):
+        names = ("ha.json", "ha-session.json", "ha-access.token")
+        for name in names:
+            path = self.root / name
+            path.write_text("fictional local HA state", encoding="utf-8")
+            path.chmod(0o600)
+        self.ha_setup.pending["fixture-state"] = (
+            "fixture-owner", self.base + "/", time.monotonic() + 20)
+        self.router.home_assistant = object()
+        cookie, csrf = self.login()
+
+        real_unlink = Path.unlink
+        session_path = self.root / "ha-session.json"
+        failed = False
+
+        def fail_session_unlink(path, *args, **kwargs):
+            nonlocal failed
+            if path == session_path and not failed:
+                failed = True
+                raise OSError("fictional unlink failure")
+            return real_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", fail_session_unlink):
+            status, _, _ = self.request("/api/setup/ha/disconnect", {}, csrf=csrf, cookie=cookie)
+        self.assertEqual(status, 503)
+        self.assertTrue(failed)
+        self.assertFalse((self.root / "ha.json").exists())
+        self.assertTrue(session_path.exists())
+        self.assertTrue((self.root / "ha-access.token").exists())
+        self.assertEqual(self.ha_setup.pending, {})
+        self.assertIsNone(self.router.home_assistant)
+        self.assertEqual(self.router.execute("turn on fictional lamp")["status"], "not-configured")
+
+        status, _, body = self.request("/api/setup/ha/disconnect", {}, csrf=csrf, cookie=cookie)
+        self.assertEqual(status, 200, body)
         self.assertTrue(all(not (self.root / name).exists() for name in names))
         self.assertIsNone(self.router.home_assistant)
 
