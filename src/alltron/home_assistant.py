@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+
+from .private_files import read_private_text
 
 
 _ENTITY = re.compile(r"(light|switch)\.[a-z0-9_]+\Z")
@@ -15,10 +16,7 @@ _ALIAS = re.compile(r"[a-z0-9][a-z0-9 -]{0,79}\Z")
 
 
 def _private_file(path: Path) -> None:
-    if not path.is_file() or path.is_symlink():
-        raise ValueError("Home Assistant configuration file is missing or is a link")
-    if os.name == "posix" and path.stat().st_mode & 0o077:
-        raise ValueError("Home Assistant configuration file must be private (chmod 600)")
+    read_private_text(path, 16 * 1024)
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -30,12 +28,14 @@ class HomeAssistant:
     """The application never accepts arbitrary service names or entity IDs from a command."""
 
     def __init__(self, port: int, token_file: Path, aliases: dict[str, str]):
-        if not 1 <= port <= 65535:
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
             raise ValueError("Invalid Home Assistant port")
         _private_file(token_file)
         self.port = port
         self.token_file = token_file
         self.aliases: dict[str, str] = {}
+        if not isinstance(aliases, dict) or not 1 <= len(aliases) <= 100:
+            raise ValueError("Select between 1 and 100 Home Assistant aliases")
         for alias, entity_id in aliases.items():
             if not isinstance(alias, str) or not isinstance(entity_id, str):
                 raise ValueError("Home Assistant aliases must be text")
@@ -50,8 +50,7 @@ class HomeAssistant:
 
     @classmethod
     def from_file(cls, path: Path) -> HomeAssistant:
-        _private_file(path)
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(read_private_text(path, 16 * 1024))
         if not isinstance(data, dict) or set(data) != {"port", "token_file", "aliases"}:
             raise ValueError("Invalid Home Assistant configuration")
         if isinstance(data["port"], bool) or not isinstance(data["port"], int):
@@ -73,12 +72,11 @@ class HomeAssistant:
             return {"kind": "home-assistant", "status": "not-allowed",
                     "text": "That device is not on Alltron's selected device list."}
         try:
-            _private_file(self.token_file)
-            token = self.token_file.read_text(encoding="utf-8").strip()
+            token = read_private_text(self.token_file, 4096).strip()
         except (OSError, ValueError):
             return {"kind": "home-assistant", "status": "auth-error",
                     "text": "Home Assistant authorization needs attention."}
-        if not token or "\n" in token or "\r" in token:
+        if not token or not re.fullmatch(r"[A-Za-z0-9._~-]+", token):
             return {"kind": "home-assistant", "status": "auth-error",
                     "text": "Home Assistant authorization needs attention."}
         domain = entity_id.split(".", 1)[0]

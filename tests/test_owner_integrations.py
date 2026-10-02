@@ -144,6 +144,10 @@ class OwnerIntegrationTests(unittest.TestCase):
         codex_home.mkdir()
         process_home = self.root / "runner-home"
         process_home.mkdir()
+        if os.name == "posix":
+            empty.chmod(0o700)
+            codex_home.chmod(0o700)
+            process_home.chmod(0o700)
         fake = self.root / "fake_cli.py"
         fake.write_text("import sys\nassert sys.argv[1:3] == ['exec', '--ephemeral']\n"
                         "assert sys.argv[-1] == '-'\n"

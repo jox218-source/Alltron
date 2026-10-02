@@ -1,6 +1,6 @@
 # Stage 2 owner integrations
 
-Evidence date: 2026-09-25. This page records the first software implementation and remaining acceptance work for Home Assistant (HA) and Codex CLI integrations. Fake HA and CLI tests pass locally. No live HA or signed-in Codex integration has been accepted. Examples and entity names are fictional.
+Evidence date: 2026-09-29. The prototype and credential/process hardening use fictional HA and CLI tests. No live HA or signed-in Codex integration has been accepted. Examples and entity names are fictional. See [security review](SECURITY_REVIEW.md) for local authorization and HA service identity deployment blockers.
 
 ## Scope and boundary
 
@@ -23,7 +23,7 @@ The two tracks can begin independently:
 
 For the first prototype, the owner creates a Home Assistant long-lived access token from the test user's profile and supplies it locally during setup. Home Assistant documents this token flow for API requests using `Authorization: Bearer …` ([REST API](https://developers.home-assistant.io/docs/api/rest/), [authentication API](https://developers.home-assistant.io/docs/auth_api/)). This is a prototype choice, not the final authorization design. HA documents long-lived access tokens as valid for ten years; treat the token as a broad, sensitive credential and revoke it after testing. Do not print it, put it in a URL, commit it, include it in logs/support bundles, or paste it into a prompt.
 
-For development, provide the token through a test-only secret file outside the repository, with owner-only filesystem permissions. `ALLTRON_HA_CONFIG` points to a separate private JSON file containing an absolute `token_file` path, a numeric loopback `port`, and an `aliases` object. The two files require mode 600 on POSIX. No token is accepted through the browser. Keep the file out of Docker build contexts, source control, backups used as fixtures, and published artifacts. Production credential provisioning, storage, rotation, revocation UX and a narrower authorization option remain open gates; do not treat a local token file as a finished installer design.
+For development, provide the token through a test-only secret file outside the repository, with owner-only filesystem permissions. `ALLTRON_HA_CONFIG` points to a separate private JSON file containing an absolute `token_file` path, a numeric loopback `port`, and an `aliases` object. The two files require mode 600 and their immediate parent directory requires mode 700 on POSIX. Reads reject links, reparse points, hardlinks and repository paths; config/token sizes are capped at 16 KiB/4 KiB. No token is accepted through the browser. Keep the file out of Docker build contexts, source control, backups used as fixtures, and published artifacts. Production credential provisioning, storage, rotation, revocation UX and a narrower authorization option remain open gates; do not treat a local token file as a finished installer design.
 
 ### Alias and action policy
 
@@ -59,7 +59,7 @@ Passing these software checks is not acceptance of real household devices, final
 
 ### Fake-runner contract
 
-The implemented adapter uses an injected runner so tests use a fake executable and no account credentials. It accepts one bounded plain-text question after local routing has classified it as a general question. The CLI transport uses fixed arguments, stdin, a 35-second timeout and a fixed instruction to answer concisely without tools or actions. It does not use a shell or interpolate question text into a command. The displayed reply is capped at 2,000 characters; a hard process-output memory cap remains to be added before production enablement. It does not pass HA credentials, audio, entity state, household files, project paths or ambient conversation history by design, but this must be verified in an isolated runner trial.
+The implemented adapter uses an injected runner so tests use a fake executable and no account credentials. It accepts one bounded plain-text question after local routing has classified it as a general question. The CLI transport uses fixed arguments, stdin, a 35-second timeout and a fixed instruction to answer concisely without tools or actions. It does not use a shell or interpolate question text into a command. The displayed reply is capped at 2,000 characters; combined stdout/stderr is bounded at 64 KiB while draining pipes. Linux cleanup kills the process group after success, failure or timeout. These transport checks do not replace OS/container isolation. It does not pass HA credentials, audio, entity state, household files, project paths or ambient conversation history by design, but this must be verified in an isolated runner trial.
 
 The fake runner should support deterministic fixtures for a normal answer, empty output, malformed output, oversized output, timeout, non-zero exit, unavailable executable and interrupted request. Tests should verify the exact input and arguments, output bounds, timeout/cancellation, error mapping, and that a failed or refused answer cannot become an HA action. Fake runs must not inspect or create a real Codex profile.
 

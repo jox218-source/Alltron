@@ -15,6 +15,7 @@ From a clean Alltron checkout on the proposed commit:
 ```sh
 python -m pip install -e ".[audit]"
 python tools/publication_audit.py
+python -m tools.credential_audit
 git diff --check b400f035ea3d69254d71bec5ced2a2fe1cdd4557..HEAD
 git status --short
 ```
