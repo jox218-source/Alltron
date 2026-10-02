@@ -277,6 +277,8 @@ def ha_lifecycle(ha_root: Path, *, stop: bool = False) -> None:
             return
         if info.get("State", {}).get("Running"):
             raise ValueError("This HA container is already running; stop its service first")
+        if info.get("State", {}).get("Status") not in {"exited", "stopped"}:
+            raise ValueError("Unexpected HA container state preserved; inspect it locally")
         subprocess.run([*podman, "rm", identity], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=True, env=environment)
     elif stop:
         return

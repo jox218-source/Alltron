@@ -161,14 +161,25 @@ class HASetup:
 
     def revoke(self) -> dict:
         with self.lock:
-            self.token()  # Validate saved session before using its refresh credential.
             session = json.loads(read_private_text(self.root / "ha-session.json", 16384))
+            if (not isinstance(session, dict) or not isinstance(session.get("refresh"), str)
+                    or not TOKEN.fullmatch(session["refresh"])):
+                raise ValueError("HA authorization needs attention")
             self._request("/auth/revoke", form={"token": session["refresh"]})
-            self.pending.clear()
-            for name in ("ha.json", "ha-session.json", "ha-access.token"):
-                path = self.root / name
+            result = self.disconnect()
+            # HA returns 200 even for an unknown grant; it is not confirmation.
+            return {**result, "remote_revocation": "requested-not-confirmed"}
+
+    def disconnect(self) -> dict:
+        """Explicit local removal, independent of HA availability or grant validity."""
+        with self.lock:
+            paths = [self.root / name for name in ("ha.json", "ha-session.json", "ha-access.token")]
+            for path in paths:
                 if path.exists():
                     read_private_text(path, 16384)
+            self.pending.clear()
+            for path in paths:
+                if path.exists():
                     path.unlink()
         return self.status()
 

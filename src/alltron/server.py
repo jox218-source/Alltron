@@ -137,7 +137,8 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
         def _trusted_host(self) -> bool:
             expected = f"127.0.0.1:{self.server.server_port}"
             if self.headers.get_all("Host") != [expected]:
-                self._json(HTTPStatus.FORBIDDEN, {"error": "Open Alltron at http://" + expected})
+                scheme = "https" if auth else "http"
+                self._json(HTTPStatus.FORBIDDEN, {"error": "Open Alltron at " + scheme + "://" + expected})
                 return False
             return True
 
@@ -185,7 +186,7 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                     self._json(HTTPStatus.OK, {"mode": "owner", "status": "locked"})
                     return
                 self._json(HTTPStatus.OK, {
-                    "version": __version__, "mode": "developer-preview", "local_timers": "ready",
+                    "version": __version__, "mode": "owner" if auth else "developer-preview", "local_timers": "ready",
                     "local_lists": "ready", "alarm_delivery": alarms.health() if alarms else {"status": "disabled"},
                     "home_assistant": router.home_assistant.health() if router.home_assistant else "not-configured",
                     "codex": "configured" if router.answers else "not-configured",
@@ -222,7 +223,7 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
             if path not in ("/api/timers", "/api/timers/cancel", "/api/alarms", "/api/alarms/cancel",
                             "/api/lists/shopping", "/api/lists/shopping/complete", "/api/commands",
                             "/api/voice/start", "/api/voice/stop", "/api/voice/cancel", "/api/login", "/api/logout",
-                            "/api/setup/ha/start", "/api/setup/ha/select", "/api/setup/ha/revoke"):
+                            "/api/setup/ha/start", "/api/setup/ha/select", "/api/setup/ha/revoke", "/api/setup/ha/disconnect"):
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
                 return
             origin = self.headers.get("Origin")
@@ -258,6 +259,7 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                     "/api/voice/stop": {"request_id"}, "/api/voice/cancel": {"request_id"},
                     "/api/login": {"password"}, "/api/logout": set(),
                     "/api/setup/ha/start": set(), "/api/setup/ha/select": {"aliases"}, "/api/setup/ha/revoke": set(),
+                    "/api/setup/ha/disconnect": set(),
                 }
                 if set(payload) - fields[path]:
                     raise ValueError("Unexpected request fields")
@@ -270,9 +272,8 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                         router.home_assistant = ha_setup.select(payload.get("aliases"))
                         result = ha_setup.status()
                     else:
-                        ha_setup.revoke()
+                        result = ha_setup.disconnect() if path.endswith("/disconnect") else ha_setup.revoke()
                         router.home_assistant = None
-                        result = ha_setup.status()
                     self._json(HTTPStatus.OK, result)
                 elif path == "/api/login":
                     if auth is None:

@@ -57,6 +57,7 @@ function clearPrivateDisplay() {
   $("#ha-load-devices").hidden = true;
   $("#ha-authorize").hidden = true;
   $("#ha-revoke").hidden = true;
+  $("#ha-disconnect").hidden = true;
   haAuthorized = false;
   $("#voice-status").replaceChildren();
   $("#voice-verification").textContent = "";
@@ -287,13 +288,14 @@ async function loadSetupStatus() {
     haAuthorized = state === "authorized" || state === "selected";
     const labels = {
       "needs-authorization": "Home Assistant authorization is needed.",
-      authorized: "Home Assistant is authorized. Choose which devices Alltron may control.",
-      selected: "Home Assistant is authorized and device selection is saved.",
+      authorized: "Home Assistant authorization is saved. Load devices to check access and choose which devices Alltron may control.",
+      selected: "Home Assistant device selection is saved. Load devices to check access.",
     };
     $("#ha-setup-status").textContent = labels[state] || "Home Assistant setup status is unavailable.";
     $("#ha-authorize").hidden = haAuthorized;
     $("#ha-load-devices").hidden = !haAuthorized;
     $("#ha-revoke").hidden = !haAuthorized;
+    $("#ha-disconnect").hidden = state === "endpoint-not-installed";
   } catch (error) {
     if (authenticated) $("#ha-setup-message").textContent = error.message;
   }
@@ -411,12 +413,32 @@ async function revokeHomeAssistantAccess() {
   if (!authenticated || !haAuthorized) return;
   const button = $("#ha-revoke");
   button.disabled = true;
-  $("#ha-setup-message").textContent = "Revoking Home Assistant access…";
+  $("#ha-setup-message").textContent = "Requesting Home Assistant grant revocation…";
   try {
-    await jsonPost("/api/setup/ha/revoke", {});
+    const result = await jsonPost("/api/setup/ha/revoke", {});
     $("#ha-device-list").replaceChildren();
     $("#ha-selection-form").hidden = true;
-    $("#ha-setup-message").textContent = "Home Assistant access was revoked.";
+    $("#ha-setup-message").textContent = result.remote_revocation === "requested-not-confirmed"
+      ? "Alltron disconnected. Revocation was requested; confirm or remove its grant in Home Assistant."
+      : "Alltron removed its saved Home Assistant connection. Check Home Assistant to confirm or remove its grant.";
+    await loadSetupStatus();
+  } catch (error) {
+    if (authenticated) $("#ha-setup-message").textContent = `${error.message} You can disconnect locally, then remove Alltron's grant in Home Assistant.`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function disconnectHomeAssistantLocally() {
+  if (!authenticated) return;
+  const button = $("#ha-disconnect");
+  button.disabled = true;
+  $("#ha-setup-message").textContent = "Removing Alltron's saved Home Assistant connection…";
+  try {
+    await jsonPost("/api/setup/ha/disconnect", {});
+    $("#ha-device-list").replaceChildren();
+    $("#ha-selection-form").hidden = true;
+    $("#ha-setup-message").textContent = "Alltron removed its saved connection. This does not revoke the Home Assistant grant; remove that grant in Home Assistant if you want to revoke access.";
     await loadSetupStatus();
   } catch (error) {
     if (authenticated) $("#ha-setup-message").textContent = error.message;
@@ -429,6 +451,7 @@ $("#ha-authorize").addEventListener("click", beginHomeAssistantAuthorization);
 $("#ha-load-devices").addEventListener("click", loadHomeAssistantDevices);
 $("#ha-selection-form").addEventListener("submit", saveHomeAssistantSelection);
 $("#ha-revoke").addEventListener("click", revokeHomeAssistantAccess);
+$("#ha-disconnect").addEventListener("click", disconnectHomeAssistantLocally);
 
 function updateVoiceControls() {
   const toggle = $("#voice-toggle");

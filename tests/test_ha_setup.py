@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -153,6 +154,68 @@ class HASetupTests(unittest.TestCase):
         for name in ("ha.json", "ha-session.json", "ha-access.token"):
             self.assertFalse((self.root / name).exists())
         self.assertEqual(self.setup.pending, {})
+
+    def _write_local_auth_files(self, *, session=None):
+        contents = {
+            "ha.json": json.dumps({"fixture": "selected fictional device"}),
+            "ha-session.json": json.dumps(session if session is not None else {
+                "client": self.origin + "/", "refresh": FAKE_REFRESH_TOKEN,
+                "expires": time.time() + 3600,
+            }),
+            "ha-access.token": FAKE_ACCESS_TOKEN,
+        }
+        for name, value in contents.items():
+            path = self.root / name
+            path.write_text(value, encoding="utf-8")
+            path.chmod(0o600)
+
+    def test_disconnect_is_offline_for_malformed_expired_and_unavailable_grants(self):
+        cases = {
+            "malformed": "not-json",
+            "expired": json.dumps({"client": self.origin + "/", "refresh": FAKE_REFRESH_TOKEN,
+                                   "expires": time.time() - 10}),
+            "offline": json.dumps({"client": self.origin + "/", "refresh": FAKE_REFRESH_TOKEN,
+                                   "expires": time.time() + 3600}),
+        }
+        with mock.patch.object(self.setup, "_request", side_effect=AssertionError("disconnect must stay offline")) as request:
+            for case, grant in cases.items():
+                with self.subTest(case=case):
+                    self._write_local_auth_files()
+                    (self.root / "ha-session.json").write_text(grant, encoding="utf-8")
+                    (self.root / "ha-session.json").chmod(0o600)
+                    self.setup.pending["fixture-state"] = ("fixture-owner", self.origin + "/", time.monotonic() + 20)
+                    self.assertEqual(self.setup.disconnect()["home_assistant"], "needs-authorization")
+                    self.assertEqual(self.setup.pending, {})
+                    self.assertTrue(all(not (self.root / name).exists()
+                                        for name in ("ha.json", "ha-session.json", "ha-access.token")))
+        request.assert_not_called()
+        self.assertEqual(FakeOAuthHA.calls, [])
+
+    def test_remote_revoke_failure_retains_local_state_until_explicit_disconnect(self):
+        self._write_local_auth_files()
+        self.setup.pending["fixture-state"] = ("fixture-owner", self.origin + "/", time.monotonic() + 20)
+        paths = [self.root / name for name in ("ha.json", "ha-session.json", "ha-access.token")]
+        with mock.patch.object(self.setup, "_request", side_effect=OSError("fictional HA offline")) as request:
+            with self.assertRaises(OSError):
+                self.setup.revoke()
+        request.assert_called_once()
+        self.assertTrue(all(path.is_file() for path in paths))
+        self.assertIn("fixture-state", self.setup.pending)
+        with mock.patch.object(self.setup, "_request") as request:
+            result = self.setup.disconnect()
+        request.assert_not_called()
+        self.assertEqual(result["home_assistant"], "needs-authorization")
+        self.assertEqual(self.setup.pending, {})
+        self.assertTrue(all(not path.exists() for path in paths))
+
+    def test_expired_session_revoke_sends_revoke_without_refresh(self):
+        expired = {"client": self.origin + "/", "refresh": FAKE_REFRESH_TOKEN,
+                   "expires": time.time() - 3600}
+        self._write_local_auth_files(session=expired)
+        result = self.setup.revoke()
+        self.assertEqual(result["remote_revocation"], "requested-not-confirmed")
+        self.assertEqual([call[0] for call in FakeOAuthHA.calls], ["/auth/revoke"])
+        self.assertEqual(FakeOAuthHA.calls[0][1]["token"], [FAKE_REFRESH_TOKEN])
 
     def test_malformed_token_type_leaves_no_authorization_files(self):
         for token_type in (None, False, 7, [], {}):

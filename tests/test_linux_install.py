@@ -67,7 +67,7 @@ class LinuxInstallTests(unittest.TestCase):
         metadata = {"Config": {"Labels": {"io.alltron.identity": label if label is not None else identity},
                                 "Image": image if image is not None else linux_install.HA_IMAGE},
                     "Mounts": [{"Source": str(root) if source is None else source, "Destination": "/config"}],
-                    "State": {"Running": running}, "Id": immutable_id}
+                    "State": {"Running": running, "Status": "running" if running else "exited"}, "Id": immutable_id}
         return mock.Mock(returncode=0, stdout=json.dumps([metadata]))
 
     @staticmethod
@@ -308,6 +308,21 @@ class LinuxInstallTests(unittest.TestCase):
         self.assertIn(linux_install.HA_IMAGE, calls[-1])
         self.assertNotIn("--replace", calls[-1])
         self.assertEqual(calls[-1][2], "run")
+
+    def test_lifecycle_preserves_unexpected_owned_container_state(self):
+        root, identity = self._ha_marker()
+        inspected = self._inspect_result(root, identity)
+        records = json.loads(inspected.stdout)
+        records[0]["State"]["Status"] = "paused"
+        inspected.stdout = json.dumps(records)
+        calls, invoke = self._mock_lifecycle([mock.Mock(returncode=0), inspected])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            with self.assertRaisesRegex(ValueError, "Unexpected"):
+                linux_install.ha_lifecycle(root)
+        self.assertEqual(len(calls), 2)
 
     def test_stop_targets_only_a_matching_owned_container(self):
         root, identity = self._ha_marker()

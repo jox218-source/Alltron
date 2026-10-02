@@ -16,6 +16,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPSHandler, HTTPCookieProcessor, Request, build_opener
 
+from alltron.commands import CommandRouter
+from alltron.ha_setup import HASetup
 from alltron.owner import OwnerAuth, password_record
 from alltron.server import PreviewHTTPServer, handler_for
 from alltron.timers import TimerStore
@@ -33,7 +35,12 @@ class OwnerSecurityTests(unittest.TestCase):
         self.wrong_password = secrets.token_urlsafe(24)
         self._write_profile()
         self.auth = OwnerAuth(self.profile)
-        self.server = PreviewHTTPServer(("127.0.0.1", 0), handler_for(TimerStore(self.root / "state.sqlite3"), auth=self.auth))
+        self.store = TimerStore(self.root / "state.sqlite3")
+        self.router = CommandRouter(self.store)
+        self.ha_setup = HASetup(self.root, 8123, self.cert)
+        self.server = PreviewHTTPServer(("127.0.0.1", 0),
+                                        handler_for(self.store, router=self.router,
+                                                    auth=self.auth, ha_setup=self.ha_setup))
         self.server.tls_context = self.auth.context()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -133,6 +140,46 @@ class OwnerSecurityTests(unittest.TestCase):
             self.assertLess(time.monotonic() - started, 4.5)
         finally:
             sock.close()
+
+    def test_ha_disconnect_endpoint_requires_owner_and_csrf_then_clears_adapter(self):
+        names = ("ha.json", "ha-session.json", "ha-access.token")
+        for name in names:
+            path = self.root / name
+            path.write_text("fictional local HA state", encoding="utf-8")
+            path.chmod(0o600)
+        self.ha_setup.pending["fixture-state"] = ("fixture-owner", self.base + "/", time.monotonic() + 20)
+        self.router.home_assistant = object()
+
+        self.assertEqual(self.request("/api/setup/ha/disconnect", {})[0], 401)
+        cookie, csrf = self.login()
+        self.assertEqual(self.request("/api/setup/ha/disconnect", {}, cookie=cookie)[0], 403)
+        self.assertTrue(all((self.root / name).exists() for name in names))
+        self.assertEqual(self.request("/api/setup/ha/disconnect", {}, csrf=csrf, cookie=cookie,
+                                      origin="https://foreign.invalid")[0], 403)
+        status, _, body = self.request("/api/setup/ha/disconnect", {}, csrf=csrf, cookie=cookie)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["home_assistant"], "needs-authorization")
+        self.assertEqual(self.ha_setup.pending, {})
+        self.assertTrue(all(not (self.root / name).exists() for name in names))
+        self.assertIsNone(self.router.home_assistant)
+
+    def test_ha_callback_returns_bad_request_when_setup_is_disabled(self):
+        store = TimerStore(self.root / "disabled-state.sqlite3")
+        server = PreviewHTTPServer(("127.0.0.1", 0), handler_for(store, auth=self.auth))
+        server.tls_context = self.auth.context()
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        base = f"https://127.0.0.1:{server.server_port}"
+        request = Request(base + "/auth/ha-callback?state=fixture-state",
+                          headers={"Host": f"127.0.0.1:{server.server_port}"})
+        try:
+            with self.assertRaises(HTTPError) as raised:
+                self.client.open(request, timeout=4)
+            self.assertEqual(raised.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)
 
 
 if __name__ == "__main__":
