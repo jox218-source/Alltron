@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import ssl
 import tempfile
 import threading
 import unittest
@@ -16,6 +17,7 @@ from alltron.commands import CommandRouter
 from alltron.home_assistant import HomeAssistant
 from alltron.server import handler_for
 from alltron.timers import TimerStore
+from tls_fixtures import make_certificate
 
 
 class FakeHA(BaseHTTPRequestHandler):
@@ -45,11 +47,16 @@ class OwnerIntegrationTests(unittest.TestCase):
             self.token_file.chmod(0o600)
         FakeHA.calls = []
         FakeHA.response_code = 200
+        self.ca_file, private_key = make_certificate(self.root, "fake-ha")
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), FakeHA)
+        tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        tls.minimum_version = ssl.TLSVersion.TLSv1_2
+        tls.load_cert_chain(self.ca_file, private_key)
+        self.server.socket = tls.wrap_socket(self.server.socket, server_side=True)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.ha = HomeAssistant(self.server.server_port, self.token_file,
-                                {"Porch Lamp": "light.porch_lamp"})
+                                {"Porch Lamp": "light.porch_lamp"}, ca_file=self.ca_file)
         self.router = CommandRouter(TimerStore(self.root / "state.sqlite3"), home_assistant=self.ha)
 
     def tearDown(self):
@@ -83,12 +90,13 @@ class OwnerIntegrationTests(unittest.TestCase):
     def test_owner_config_rejects_broad_and_unsafe_targets(self):
         for entity in ("lock.front_door", "light.*", "light.porch_lamp/../../other"):
             with self.assertRaises(ValueError):
-                HomeAssistant(self.server.server_port, self.token_file, {"lamp": entity})
+                HomeAssistant(self.server.server_port, self.token_file, {"lamp": entity}, ca_file=self.ca_file)
         with self.assertRaises(ValueError):
-            HomeAssistant(self.server.server_port, self.token_file, {"Lamp": "light.a", "lamp": "light.b"})
+            HomeAssistant(self.server.server_port, self.token_file, {"Lamp": "light.a", "lamp": "light.b"}, ca_file=self.ca_file)
         config = self.root / "ha.json"
         config.write_text(json.dumps({"port": self.server.server_port,
                                       "token_file": str(self.token_file),
+                                      "ca_file": str(self.ca_file),
                                       "aliases": {"Porch Lamp": "light.porch_lamp"}}), encoding="utf-8")
         if os.name == "posix":
             config.chmod(0o600)

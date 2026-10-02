@@ -2,67 +2,66 @@
 
 ## Current status
 
-**Alltron is pre-alpha.** The repository contains a local Python preview for timers, typed commands, shopping items, opt-in speech adapters and an opt-in Home Assistant light/switch prototype. It is not an appliance installer. It does not install Home Assistant or connect the running service to Codex, and no live speech or Raspberry Pi profile has been accepted. The default run leaves audio and Home Assistant disabled; see [speech development](VOICE_DEVELOPMENT.md) and [Stage 2 development](STAGE2_DEVELOPMENT.md) for test-only paths. Do not install this preview on a production household Pi.
+**Alltron is pre-alpha.** The Linux owner mode and Home Assistant OAuth setup UI are implemented, but live Home Assistant authorization, service deployment, speech, and hardware acceptance remain open. The Linux service CLI prepares and installs user units, but activation is deliberately refused pending acceptance. Codex answers are hard-disabled. This is not a Pi appliance installer; do not install it on a production household Pi. See [owner setup](OWNER_SETUP.md), [Linux services](LINUX_SERVICES.md), [speech development](VOICE_DEVELOPMENT.md), and [Stage 2 development](STAGE2_DEVELOPMENT.md).
 
-The commands below run the developer preview on a computer with Python 3.11 or newer. The owner installation guide for the future Pi appliance will be written after its installer and recovery path are implemented and tested on a dedicated device. The intended first setup is designed to install Home Assistant Container on the same Pi, then guide the owner through Home Assistant authorization and their own Codex CLI sign-in. The current HA token-file prototype is for disposable tests; no guided account flow is implemented yet.
+An unqualified `python -m alltron` launch now exits with an error. Choose one of the two explicit paths below: Linux owner mode with a private owner profile and HTTPS, or the disconnected fictional fixture preview. Do not use fixture mode with household data or credentials.
 
-## For contributors
+## Linux owner quickstart
 
-You can review the design and propose changes through GitHub. The package currently has no third-party runtime dependencies. Python 3.11 or newer and pip are required to create the local environment and install the preview.
-
-### Windows PowerShell
-
-From the repository root:
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e .
-alltron --check
-alltron
-```
-
-If PowerShell blocks virtual-environment activation, use the platform's documented Python activation guidance or run the executable directly as `& .\.venv\Scripts\alltron.exe --check` and `& .\.venv\Scripts\alltron.exe`.
-
-### Linux / Raspberry Pi OS / macOS
-
-From the repository root with Python 3.11 or newer:
+Use this owner quickstart only in a disposable Linux environment while Alltron remains pre-alpha. Python 3.11 or newer and OpenSSL are required. Run as an ordinary Linux user, without `sudo`. Choose a dedicated absolute profile outside the repository and any shared or synchronized directory:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e .
-alltron --check
-alltron
+python -m alltron.setup --profile /absolute/private/alltron-profile
+alltron --owner-profile /absolute/private/alltron-profile/owner.json
 ```
 
-The `--check` command prints the Python version, timer data directory, and preview mode, then exits without starting the server. The default server URL is `http://127.0.0.1:8765`. Open that exact loopback address in a browser on the same computer. The health endpoint is `http://127.0.0.1:8765/api/health`. Stop the server with Ctrl+C in its terminal. You may choose another port with `alltron --port 8766`; use the matching URL `http://127.0.0.1:8766` and health endpoint `http://127.0.0.1:8766/api/health`.
+The setup command prompts twice for a local Alltron password without echoing it. It creates the owner profile and HTTPS certificate. Open the exact `https://127.0.0.1:<port>` address printed by Alltron on the same device. Before entering the password in the browser, compare the browser certificate's SHA-256 fingerprint with:
 
-Timer, alarm and shopping state is stored in SQLite at `~/.local/share/alltron/timers.sqlite3` on Linux/macOS or the platform home directory's `.local/share/alltron/timers.sqlite3` path on Windows. To use a different data folder for one run, set `ALLTRON_DATA_DIR` before launching. In PowerShell: `$env:ALLTRON_DATA_DIR = 'C:\AlltronData'`; in a POSIX shell: `ALLTRON_DATA_DIR="$HOME/alltron-data" alltron`. On POSIX, Alltron creates its data folder for owner access (0700) and the database for owner read/write (0600); if an existing folder or database is readable by other users, startup stops and asks you to correct permissions. It does not change permissions on an existing shared folder. Keep the folder private on every platform; labels and list items may contain household information. The direct development run has no managed backup workflow. The versioned preview below provides backups only for its separate managed data folder; do not treat either as protected household data.
+```sh
+openssl x509 -in /absolute/private/alltron-profile/alltron.crt -noout -fingerprint -sha256
+```
 
-The preview binds only to `127.0.0.1`; it is not accessible to other devices on the LAN. Do not change the bind address or put it on the public internet.
+Trust only this generated certificate after the fingerprints match exactly. Stop if they differ or the browser cannot verify the expected identity. The browser uses the local Alltron password only to unlock the local service. Home Assistant OAuth access and refresh credentials stay server-side in the private owner profile; the UI never asks for a Home Assistant password or token. In the Connections panel, the owner can start Home Assistant authorization, select listed entities, assign names, and request revocation. Live authorization remains unaccepted; see [OWNER_SETUP.md](OWNER_SETUP.md) for TLS prerequisites and revocation behavior. Codex answers are hard-disabled.
 
-This preview assumes a trusted, single-user computer. Other local processes may reach the loopback API; do not use it for sensitive household information on a shared machine.
+Linux service preparation uses the exact managed source archive and requires rootless Podman and systemd user services. The installer can prepare and install private user units but activation is currently refused pending disposable Linux acceptance. See [LINUX_SERVICES.md](LINUX_SERVICES.md). Do not enable or start the units manually.
+
+## Disconnected fictional fixture preview
+
+This explicit cross-platform preview uses an isolated temporary data directory outside the Git checkout. It is disconnected from Home Assistant and Codex and must use fictional data only.
+
+Linux/macOS:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+mkdir -p /tmp/alltron-fixture-data
+ALLTRON_DATA_DIR=/tmp/alltron-fixture-data python -m alltron --fixture-preview
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -e .
+$env:ALLTRON_DATA_DIR = Join-Path $env:TEMP 'alltron-fixture-data'
+New-Item -ItemType Directory -Force -Path $env:ALLTRON_DATA_DIR | Out-Null
+& .\.venv\Scripts\python.exe -m alltron --fixture-preview
+```
+
+Open **http://127.0.0.1:8765** on the same computer. Fixture mode does not use owner login, Home Assistant, Codex, or live speech engines. Do not supply real credentials or household data. Stop the process with Ctrl+C. The fixture data directory is separate from the repository and from the production owner profile.
+
+## For contributors
+
+You can review the design and propose changes through GitHub. The package currently has no third-party runtime dependencies. Python 3.11 or newer and pip are required to create the local environment and install the preview.
 
 ## Versioned developer preview
 
 The [preview release manager](PREVIEW_INSTALL.md) checks prerequisites, stages a checksum-verified source archive in a private local folder, tests it with disposable data, and offers managed startup and code rollback. Use this to rehearse software updates on a computer. Its [backup and restore commands](PREVIEW_BACKUP.md) preserve local timer, alarm and shopping state, with a safety copy before replacement. It does not install Home Assistant, configure services/kiosk/audio, back up accounts or HA data, or establish Pi support. Keep the trusted archive checksum available and stop the managed preview before updating it.
-
-## Planned owner setup
-
-The following sequence is a design target, not a working procedure:
-
-1. Confirm the exact Pi, storage, display, microphone, speaker, network and operating-system versions are on Alltron's tested hardware list.
-2. Back up the Pi and follow a versioned installer that checks the device and prerequisites before making changes.
-3. Open the local setup screen and create the Home Assistant owner account using Home Assistant's own setup flow.
-4. Authorize Alltron from Home Assistant. Alltron must never ask for the owner's Home Assistant password.
-5. Sign in to Codex CLI using the account's supported device login flow, then run a harmless connection check.
-6. Select the Home Assistant entities Alltron may control, run microphone/speaker checks, and confirm a test action.
-7. Verify the health screen, reboot recovery, backup location, and uninstall instructions before enabling unattended use.
-
-The installer must stop with a plain-language explanation when a check fails. It must not silently skip a failed security or hardware check, and it must provide a supported recovery path before beta.
 
 ## Before a future install
 

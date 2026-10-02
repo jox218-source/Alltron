@@ -1,6 +1,6 @@
 # Security review and remaining gates
 
-Evidence date: 2026-09-29. Alltron remains a trusted single-user developer preview.
+Evidence date: 2026-10-02. Alltron owner mode requires local password authentication and HTTPS; appliance acceptance remains open.
 This review does not certify that the project has no vulnerabilities.
 
 ## Three review layers
@@ -46,11 +46,8 @@ This review does not certify that the project has no vulnerabilities.
 Resolve these before an appliance installer enables real integrations or a beta
 claims hardened operation:
 
-- The loopback UI/API has no account authentication; other local processes may
-  access it. Add and independently test local authorization for data/actions.
-- The HA prototype uses loopback HTTP, which does not authenticate the service
-  endpoint. Establish a verified endpoint/service identity and evaluate token
-  authority before provisioning real owner credentials in the appliance.
+- Local API authentication is implemented with CLI enrollment, PBKDF2, bounded expiring sessions, secure cookies and session-bound CSRF. Fictional HTTPS tests pass. Clean-browser trust, certificate rotation and independent owner acceptance remain open. Explicit disconnected fixture mode remains unauthed and must contain only fictional data.
+- HA now requires a pinned local certificate and verified HTTPS before token transmission. Owner-bound OAuth, refresh/revocation and explicit light/switch selection have fictional TLS tests; native HA Container onboarding, token authority and outages still require live disposable acceptance.
 - Signed-in Codex is **disabled by `serve()`**. Establish a dedicated OS/container
   identity, isolated filesystem/credential store, network policy and resource
   limits, then accept owner sign-in/revocation in a disposable environment. Never
@@ -59,9 +56,7 @@ claims hardened operation:
   [authentication](https://learn.chatgpt.com/docs/auth) and
   [non-interactive](https://learn.chatgpt.com/docs/non-interactive-mode) guides.
 - Live disposable HA, fresh-owner setup, Linux service installation, speech asset
-  review and dedicated-Pi acceptance remain pending. The disposable Linux Docker
-  engine was unavailable in this session. WSL unit tests are not container
-  isolation or signed-in acceptance evidence.
+  review and dedicated-Pi acceptance remain pending. The existing Docker Linux engine was unavailable. A separate clean Linux lab is being prepared; its outcomes must be recorded separately. Unit tests are not signed-in acceptance evidence.
 
 ## Historical personal information
 
@@ -73,3 +68,7 @@ contains no personal data. No new personal information is authorized for publica
 
 See the candidate PR for exact revision, scanner/test/archive results and Sol
 approval. Rerun review after changes; scanner success is not production acceptance.
+
+## Owner setup and service preparation
+
+Local enrollment publishes a complete private TLS/password profile atomically. The owner UI guides HA OAuth and device selection; no HA password or token is passed through Alltron browser forms. Service preparation reuses verified committed archives, creates a separate private HA TLS profile and pins the official 2026.9.4 multiarchitecture image index. Generated user units constrain app filesystem/network/resources. Unit identity is checked before stopping/removing services. Activation is disabled until actual disposable runtime acceptance. No Codex credentials are imported, and the web service never instantiates the Codex transport. See [owner setup](OWNER_SETUP.md), [service procedure](LINUX_SERVICES.md), [acceptance checklist](SOFTWARE_ACCEPTANCE.md) and [speech provenance](SPEECH_PROVENANCE.md).

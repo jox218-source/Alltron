@@ -39,3 +39,11 @@ tools/__init__.py
 tools/build_release.py
 tools/preview_install.py
 tools/preview_backup.py
+docs/OWNER_SETUP.md
+docs/SOFTWARE_ACCEPTANCE.md
+docs/SPEECH_PROVENANCE.md
+docs/LINUX_SERVICES.md
+src/alltron/owner.py
+src/alltron/setup.py
+src/alltron/ha_setup.py
+tools/linux_install.py

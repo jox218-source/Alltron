@@ -473,7 +473,7 @@ def serve_locked(root: Path, port: int) -> None:
             raise InstallError("Start the managed preview in a fresh Python process")
         sys.path.insert(0, str(content / "src"))
         from alltron.server import serve
-        serve(port=port, store_path=data / "timers.sqlite3")
+        serve(port=port, store_path=data / "timers.sqlite3", fixture=True)
 
 
 def run(root: Path, port: int) -> int:

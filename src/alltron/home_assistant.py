@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+import ssl
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 
 from .private_files import read_private_text
 
@@ -27,12 +28,17 @@ class _NoRedirect(HTTPRedirectHandler):
 class HomeAssistant:
     """The application never accepts arbitrary service names or entity IDs from a command."""
 
-    def __init__(self, port: int, token_file: Path, aliases: dict[str, str]):
+    def __init__(self, port: int, token_file: Path, aliases: dict[str, str], ca_file: Path, *, token_supplier=None):
         if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
             raise ValueError("Invalid Home Assistant port")
         _private_file(token_file)
         self.port = port
         self.token_file = token_file
+        self.ca_file = ca_file
+        self.token_supplier = token_supplier
+        self.context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
+        self.context.load_verify_locations(cadata=read_private_text(ca_file, 16384))
         self.aliases: dict[str, str] = {}
         if not isinstance(aliases, dict) or not 1 <= len(aliases) <= 100:
             raise ValueError("Select between 1 and 100 Home Assistant aliases")
@@ -49,18 +55,18 @@ class HomeAssistant:
             raise ValueError("Select at least one Home Assistant light or switch")
 
     @classmethod
-    def from_file(cls, path: Path) -> HomeAssistant:
+    def from_file(cls, path: Path, *, token_supplier=None) -> HomeAssistant:
         data = json.loads(read_private_text(path, 16 * 1024))
-        if not isinstance(data, dict) or set(data) != {"port", "token_file", "aliases"}:
+        if not isinstance(data, dict) or set(data) != {"port", "token_file", "aliases", "ca_file"}:
             raise ValueError("Invalid Home Assistant configuration")
         if isinstance(data["port"], bool) or not isinstance(data["port"], int):
             raise ValueError("Invalid Home Assistant port")
-        if not isinstance(data["token_file"], str) or not isinstance(data["aliases"], dict):
+        if not isinstance(data["token_file"], str) or not isinstance(data["aliases"], dict) or not isinstance(data["ca_file"], str):
             raise ValueError("Invalid Home Assistant configuration")
         token_file = Path(data["token_file"])
         if not token_file.is_absolute():
             raise ValueError("Home Assistant token path must be absolute")
-        return cls(data["port"], token_file, data["aliases"])
+        return cls(data["port"], token_file, data["aliases"], Path(data["ca_file"]), token_supplier=token_supplier)
 
     def health(self) -> str:
         return "configured"  # Network and authorization are checked only by an explicit action.
@@ -72,7 +78,7 @@ class HomeAssistant:
             return {"kind": "home-assistant", "status": "not-allowed",
                     "text": "That device is not on Alltron's selected device list."}
         try:
-            token = read_private_text(self.token_file, 4096).strip()
+            token = self.token_supplier() if self.token_supplier else read_private_text(self.token_file, 4096).strip()
         except (OSError, ValueError):
             return {"kind": "home-assistant", "status": "auth-error",
                     "text": "Home Assistant authorization needs attention."}
@@ -82,13 +88,13 @@ class HomeAssistant:
         domain = entity_id.split(".", 1)[0]
         service = "turn_on" if on else "turn_off"
         request = Request(
-            f"http://127.0.0.1:{self.port}/api/services/{domain}/{service}",
+            f"https://127.0.0.1:{self.port}/api/services/{domain}/{service}",
             data=json.dumps({"entity_id": entity_id}).encode("utf-8"),
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             method="POST",
         )
         try:
-            with build_opener(ProxyHandler({}), _NoRedirect).open(request, timeout=4) as response:
+            with build_opener(ProxyHandler({}), _NoRedirect, HTTPSHandler(context=self.context)).open(request, timeout=4) as response:
                 if response.status not in (200, 201):
                     raise URLError("Unexpected Home Assistant response")
         except HTTPError as exc:

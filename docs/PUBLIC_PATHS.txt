@@ -66,3 +66,15 @@ tests/test_credential_boundaries.py
 tests/test_credential_audit.py
 tests/test_http_bounds.py
 docs/SECURITY_REVIEW.md
+docs/OWNER_SETUP.md
+docs/SOFTWARE_ACCEPTANCE.md
+docs/SPEECH_PROVENANCE.md
+docs/LINUX_SERVICES.md
+src/alltron/owner.py
+src/alltron/setup.py
+src/alltron/ha_setup.py
+tools/linux_install.py
+tests/tls_fixtures.py
+tests/test_owner_security.py
+tests/test_ha_setup.py
+tests/test_linux_install.py
