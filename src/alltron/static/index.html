@@ -15,6 +15,19 @@
       <p class="lede">A local workspace for building a dependable household assistant.</p>
     </header>
 
+    <section id="owner-access" class="panel access-panel" aria-labelledby="access-title">
+      <h2 id="access-title">Unlock this local workspace</h2>
+      <p id="access-help">Use the owner password created locally by the setup CLI. Before entering it, verify the HTTPS identity shown by your browser.</p>
+      <form id="login-form">
+        <label for="owner-password">Owner password</label>
+        <input id="owner-password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+        <button id="login-button" type="submit">Unlock</button>
+      </form>
+      <p id="access-message" class="message" role="status" aria-live="polite"></p>
+      <button id="logout-button" class="secondary" type="button" hidden>Lock and log out</button>
+    </section>
+
+    <div id="private-app" hidden>
     <section class="notice" aria-label="Preview status">
       <strong>What works today</strong>
       <span>Local timers, typed commands, a shopping list and service-side push-to-talk controls are available in this preview. Voice capture uses the local service; spoken setup still needs verification. Home Assistant and Codex connections are in development.</span>
@@ -56,8 +69,26 @@
       </section>
 
       <section class="panel" aria-labelledby="connect-title">
-        <div class="panel-heading"><h2 id="connect-title">Connections</h2><span class="pill subdued">COMING NEXT</span></div>
+        <div class="panel-heading"><h2 id="connect-title">Connections</h2><span class="pill subdued">LOCAL SETUP</span></div>
         <div id="connections" class="connections" aria-live="polite"></div>
+        <section class="setup-panel" aria-labelledby="ha-setup-title">
+          <h3 id="ha-setup-title">Home Assistant setup</h3>
+          <p>Alltron uses Home Assistant’s authorization page on this device. It never asks for your Home Assistant password or token.</p>
+          <p id="ha-setup-status" class="setup-status" role="status" aria-live="polite">Checking setup…</p>
+          <button id="ha-authorize" type="button">Authorize Home Assistant</button>
+          <button id="ha-load-devices" class="secondary" type="button" hidden>Load available devices</button>
+          <form id="ha-selection-form" hidden>
+            <fieldset>
+              <legend>Choose devices and give each a short spoken name</legend>
+              <div id="ha-device-list" class="ha-device-list"></div>
+            </fieldset>
+            <button type="submit">Save selected devices</button>
+          </form>
+          <button id="ha-revoke" class="secondary" type="button" hidden>Revoke Home Assistant access</button>
+          <button id="ha-disconnect" class="secondary" type="button" hidden>Disconnect locally</button>
+          <p id="ha-setup-message" class="message" role="status" aria-live="polite"></p>
+          <p id="codex-setup-status" class="fine">Codex answers are disabled pending isolation acceptance.</p>
+        </section>
         <h3 class="voice-heading">Voice status</h3>
         <p class="fine">Push-to-talk is handled by the local service. This page does not record audio in your browser.</p>
         <div id="voice-status" class="connections" aria-live="polite"></div>
@@ -68,11 +99,12 @@
         </div>
         <p id="voice-message" class="message" role="status" aria-live="polite"></p>
         <ol id="voice-events" class="voice-events" aria-label="Voice activity"></ol>
-        <p class="fine">Alltron does not collect account logins in this preview. Future setup will keep Home Assistant and Codex credentials on the owner’s device.</p>
+        <p class="fine">The local Alltron password is verified by the local service. Home Assistant OAuth access and refresh credentials stay in the private server-side owner profile. Codex answers are disabled pending isolation acceptance.</p>
       </section>
     </div>
 
     <footer><span id="service-status">Connecting to local service…</span><span>Open source · Pre-alpha</span></footer>
+    </div>
   </main>
 </body>
 </html>
