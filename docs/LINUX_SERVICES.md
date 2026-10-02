@@ -1,6 +1,14 @@
 # Linux services
 
-Evidence date: 2026-10-02. The Linux service command interface is implemented in [`tools/linux_install.py`](../tools/linux_install.py). Its deployment and recovery path remains unaccepted: there is no disposable Linux service rehearsal or independent owner trial recorded here, and activation is deliberately refused. This document makes no VM, runtime, clean-install, or hardware claim.
+Evidence date: 2026-10-02. The Linux service command interface is implemented in [`tools/linux_install.py`](../tools/linux_install.py). A lead reports partial checks in a new checksum-verified Ubuntu 24.04 WSL2 lab; deployment and recovery remain unaccepted, and activation is deliberately refused. The current public source contains lifecycle changes after the tested commit noted below; no current-source full-suite result or independent owner trial is recorded. This document makes no general VM, clean-install, or hardware claim.
+
+## Reported partial lab observations
+
+On 2026-10-02, the lead reported verifying rootless Podman 4.9.3, systemd 255 user units, and successful user-unit starts in a new Ubuntu 24.04 WSL2 lab. The lab had Windows automount and interop disabled, shared mounts masked, and no user-private folders or profile copies. The report did not include private lab identity, paths, fingerprints, or credentials.
+
+A separate lead-reported Linux run at public source commit `b6c3ea7` completed with 120 tests passed and 1 skipped. Later lifecycle changes are present in the current public source; this count is historical and must not be presented as the current suite result. The exact current public revision has no recorded full-suite result.
+
+This evidence does not establish final service acceptance. The `activate` command still refuses service activation. No clean install/update/rollback rehearsal, independent owner trial, service restart/reboot recovery, or supported hardware profile is accepted here.
 
 ## Requirements
 
@@ -66,6 +74,6 @@ The preview [backup and restore tool](PREVIEW_BACKUP.md) covers the Alltron SQLi
 
 ## Acceptance evidence still required
 
-The command API and simulated source-level coverage exist, but these facts are not deployment acceptance. A lead-reported baseline of 111 passing tests predates the Linux installer changes; it is not a current full-suite count and does not establish the result of the installer tests. No post-installer full-suite count is recorded here. Record a fresh test result separately. Then rehearse preflight, prepare, service install/deactivate/uninstall, refused activation, managed update and rollback, backup/restore boundaries, state preservation, TLS, HA first boot and recovery in a disposable Linux environment. Follow with an independent owner trial. Keep the [software acceptance checklist](SOFTWARE_ACCEPTANCE.md) open until those results are recorded; keep the separate hardware gate open as well.
+The lead reports a Linux run at `b6c3ea7` with 120 tests passed and 1 skipped, before subsequent service lifecycle changes in the current public source. This is not a current full-suite count, and no run result for the exact current source revision is recorded. The partial WSL2 checks above do not establish deployment acceptance. Rerun the full suite at an exact recorded public revision. Then rehearse preflight, prepare, service install/deactivate/uninstall, refused activation, managed update and rollback, backup/restore boundaries, state preservation, TLS, HA first boot and recovery in a disposable Linux environment. Follow with an independent owner trial. Keep the [software acceptance checklist](SOFTWARE_ACCEPTANCE.md) open until those results are recorded; keep the separate hardware gate open as well.
 
 Home Assistant's 2026.8 release moved HTTP server settings into **Settings > System > Network** and migrates existing YAML settings on first startup after upgrade. Check the imported TLS values and follow the repair notice before the manual HA first boot/onboarding step. See [OWNER_SETUP.md](OWNER_SETUP.md), the [HTTP integration guide](https://www.home-assistant.io/integrations/http/), and [Home Assistant 2026.8 release notes](https://www.home-assistant.io/blog/2026/08/05/release-20268/).

@@ -51,6 +51,38 @@ class LinuxInstallTests(unittest.TestCase):
         (content / "tools" / "linux_install.py").write_text("synthetic reviewed archive", encoding="utf-8")
         return root, profile, ha_root, content
 
+    def _ha_marker(self):
+        root = self.temp / "fictional-ha-lifecycle"
+        root.mkdir(mode=0o700)
+        root.chmod(0o700)
+        identity = "a1b2c3d4" * 4
+        marker = root / "alltron-ha.json"
+        marker.write_text(json.dumps({"format": "alltron-ha-1", "image": linux_install.HA_IMAGE,
+                                      "port": 8123, "identity": identity}), encoding="utf-8")
+        marker.chmod(0o600)
+        return root, identity
+
+    def _inspect_result(self, root, identity, *, running=False, image=None, label=None, source=None,
+                        immutable_id="0123456789abcdef" * 4):
+        metadata = {"Config": {"Labels": {"io.alltron.identity": label if label is not None else identity},
+                                "Image": image if image is not None else linux_install.HA_IMAGE},
+                    "Mounts": [{"Source": str(root) if source is None else source, "Destination": "/config"}],
+                    "State": {"Running": running}, "Id": immutable_id}
+        return mock.Mock(returncode=0, stdout=json.dumps([metadata]))
+
+    @staticmethod
+    def _mock_lifecycle(outcomes):
+        calls = []
+
+        def invoke(args, **kwargs):
+            calls.append(list(args))
+            result = outcomes[len(calls) - 1]
+            if isinstance(result, BaseException):
+                raise result
+            return result
+
+        return calls, invoke
+
     def test_safe_path_rejects_unit_mount_control_and_traversal_syntax(self):
         from pathlib import PurePosixPath
 
@@ -80,6 +112,7 @@ class LinuxInstallTests(unittest.TestCase):
         manifest = {"version": "0.1.0-fictional"}
         real_run = linux_install.subprocess.run
         with (mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
               mock.patch.object(linux_install.shutil, "which", side_effect=lambda name: OPENSSL if name == "openssl" else f"/fake/{name}"),
               mock.patch.object(linux_install.manager, "locked", return_value=nullcontext()),
               mock.patch.object(linux_install.manager, "load_state", return_value={"current": "fictional-release-id"}),
@@ -99,13 +132,12 @@ class LinuxInstallTests(unittest.TestCase):
         self.assertIn("RestrictAddressFamilies=AF_INET", app_unit)
         self.assertIn("MemoryMax=512M", app_unit)
         self.assertIn("TasksMax=32", app_unit)
-        self.assertIn(linux_install.HA_IMAGE, ha_unit)
-        self.assertIn("--pull=never", ha_unit)
-        self.assertIn("--cap-drop=ALL", ha_unit)
-        self.assertIn("--security-opt=no-new-privileges", ha_unit)
-        self.assertIn("--pids-limit=256", ha_unit)
-        self.assertIn("--memory=2g", ha_unit)
-        self.assertIn("--publish=127.0.0.1:8123:8123", ha_unit)
+        self.assertIn("run-ha --ha-root", ha_unit)
+        self.assertIn("stop-ha --ha-root", ha_unit)
+        self.assertNotIn("podman run", ha_unit)
+        marker = json.loads((ha_root / "alltron-ha.json").read_text(encoding="utf-8"))
+        self.assertEqual(marker["image"], linux_install.HA_IMAGE)
+        self.assertRegex(marker["identity"], r"\A[0-9a-f]{32}\Z")
         self.assertTrue((profile / "owner.json").is_file())
         self.assertTrue((ha_root / "ha.crt").is_file())
         self.assertTrue((ha_root / "ha.key").is_file())
@@ -225,6 +257,82 @@ class LinuxInstallTests(unittest.TestCase):
             self.assertEqual(first.read_text(encoding="utf-8"), expected_first)
             self.assertEqual(second.read_text(encoding="utf-8"), "[Unit]\nDescription=Third-party HA service\n")
         run.assert_not_called()
+
+    def test_lifecycle_refuses_unrelated_container_before_removal_or_stop(self):
+        root, identity = self._ha_marker()
+        calls, invoke = self._mock_lifecycle([
+            mock.Mock(returncode=0), self._inspect_result(root, identity, label="different-fictional-id")])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            with self.assertRaisesRegex(ValueError, "different container"):
+                linux_install.ha_lifecycle(root)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual([call[2] for call in calls], ["container", "inspect"])
+
+    def test_lifecycle_refuses_to_start_already_running_owned_container(self):
+        root, identity = self._ha_marker()
+        calls, invoke = self._mock_lifecycle([
+            mock.Mock(returncode=0), self._inspect_result(root, identity, running=True)])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            with self.assertRaisesRegex(ValueError, "already running"):
+                linux_install.ha_lifecycle(root)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual([call[2] for call in calls], ["container", "inspect"])
+
+    def test_lifecycle_cleans_stopped_owned_container_then_uses_fixed_run_resources(self):
+        root, identity = self._ha_marker()
+        calls, invoke = self._mock_lifecycle([
+            mock.Mock(returncode=0), self._inspect_result(root, identity),
+            mock.Mock(returncode=0), mock.Mock(returncode=0)])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            linux_install.ha_lifecycle(root)
+        self.assertEqual([call[2] for call in calls], ["container", "inspect", "rm", "run"])
+        self.assertEqual(calls[2][-1], "0123456789abcdef" * 4)
+        self.assertEqual(calls[-1][3], "--rm")
+        self.assertIn("--pull=never", calls[-1])
+        self.assertIn("--label=io.alltron.identity=" + identity, calls[-1])
+        self.assertIn("--cap-drop=ALL", calls[-1])
+        self.assertIn("--security-opt=no-new-privileges", calls[-1])
+        self.assertIn("--pids-limit=256", calls[-1])
+        self.assertIn("--memory=2g", calls[-1])
+        self.assertIn("--publish=127.0.0.1:8123:8123", calls[-1])
+        self.assertIn("--volume=" + str(root) + ":/config:Z", calls[-1])
+        self.assertIn(linux_install.HA_IMAGE, calls[-1])
+        self.assertNotIn("--replace", calls[-1])
+        self.assertEqual(calls[-1][2], "run")
+
+    def test_stop_targets_only_a_matching_owned_container(self):
+        root, identity = self._ha_marker()
+        calls, invoke = self._mock_lifecycle([
+            mock.Mock(returncode=0), self._inspect_result(root, identity, label="unowned-fixture")])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            with self.assertRaisesRegex(ValueError, "different container"):
+                linux_install.ha_lifecycle(root, stop=True)
+        self.assertEqual(len(calls),  2)
+        self.assertNotIn("stop", [call[2] for call in calls])
+
+        calls, invoke = self._mock_lifecycle([
+            mock.Mock(returncode=0), self._inspect_result(root, identity, running=True),
+            mock.Mock(returncode=0)])
+        with (mock.patch.object(linux_install, "user"),
+              mock.patch.object(linux_install, "safe_path", side_effect=lambda path: path),
+              mock.patch.object(linux_install, "local_podman", return_value=(["/fake/podman", "--remote=false"], {})),
+              mock.patch.object(linux_install.subprocess, "run", side_effect=invoke)):
+            linux_install.ha_lifecycle(root, stop=True)
+        self.assertEqual([call[2] for call in calls], ["container", "inspect", "stop"])
+        self.assertEqual(calls[-1][-1], "0123456789abcdef" * 4)
+        self.assertEqual(calls[-1][3:5], ["--time=20", "0123456789abcdef" * 4])
 
 
 if __name__ == "__main__":

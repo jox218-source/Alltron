@@ -47,7 +47,7 @@ Resolve these before an appliance installer enables real integrations or a beta
 claims hardened operation:
 
 - Local API authentication is implemented with CLI enrollment, PBKDF2, bounded expiring sessions, secure cookies and session-bound CSRF. Fictional HTTPS tests pass. Clean-browser trust, certificate rotation and independent owner acceptance remain open. Explicit disconnected fixture mode remains unauthed and must contain only fictional data.
-- HA now requires a pinned local certificate and verified HTTPS before token transmission. Owner-bound OAuth, refresh/revocation and explicit light/switch selection have fictional TLS tests; native HA Container onboarding, token authority and outages still require live disposable acceptance.
+- HA now requires a pinned local certificate and verified HTTPS before token transmission. Owner-bound OAuth, refresh/revocation and explicit light/switch selection have fictional TLS tests. The lead reports native TLS and fictional-owner onboarding/OAuth callback-code exchange with Home Assistant 2026.9.4 in a new isolated Ubuntu 24.04 WSL2 lab. This does not show a successful virtual on/off action, outage recovery, remote revocation, or fresh browser trust. These remain live acceptance blockers.
 - Signed-in Codex is **disabled by `serve()`**. Establish a dedicated OS/container
   identity, isolated filesystem/credential store, network policy and resource
   limits, then accept owner sign-in/revocation in a disposable environment. Never
@@ -55,8 +55,9 @@ claims hardened operation:
   rollout persistence; it does not remove login credentials. See OpenAI's
   [authentication](https://learn.chatgpt.com/docs/auth) and
   [non-interactive](https://learn.chatgpt.com/docs/non-interactive-mode) guides.
-- Live disposable HA, fresh-owner setup, Linux service installation, speech asset
-  review and dedicated-Pi acceptance remain pending. The existing Docker Linux engine was unavailable. A separate clean Linux lab is being prepared; its outcomes must be recorded separately. Unit tests are not signed-in acceptance evidence.
+- The lead reports rootless Podman 4.9.3 and systemd 255 user units verified with successful unit starts in that WSL2 lab. A separate Windows rehearsal of the actual managed source archive passed install, run, lock, and application backup/restore. These are partial observations only; they do not establish service update/recovery, owner acceptance, or a hardware profile. Linux service activation remains gated.
+- Codex remains hard-disabled. No real Codex sign-in has been tested. Complete and review the network and credential-store boundary, then run a human-authorized sign-in in a disposable environment with cleanup, timeout, auth-expiry and failure checks before beta. No developer profile may be reused.
+- A lead-reported Linux run at public source commit `b6c3ea7` passed 120 tests and skipped 1, but later lifecycle changes are present in the current public source. This is not the current full-suite result; no result for the exact current public revision is recorded. Rerun and record it. Fresh browser trust, certificate rotation, remote HA revocation/outage behavior, service update/recovery, independent owner acceptance, speech asset review and dedicated-Pi acceptance remain open.
 
 ## Historical personal information
 
@@ -72,3 +73,5 @@ approval. Rerun review after changes; scanner success is not production acceptan
 ## Owner setup and service preparation
 
 Local enrollment publishes a complete private TLS/password profile atomically. The owner UI guides HA OAuth and device selection; no HA password or token is passed through Alltron browser forms. Service preparation reuses verified committed archives, creates a separate private HA TLS profile and pins the official 2026.9.4 multiarchitecture image index. Generated user units constrain app filesystem/network/resources. Unit identity is checked before stopping/removing services. Activation is disabled until actual disposable runtime acceptance. No Codex credentials are imported, and the web service never instantiates the Codex transport. See [owner setup](OWNER_SETUP.md), [service procedure](LINUX_SERVICES.md), [acceptance checklist](SOFTWARE_ACCEPTANCE.md) and [speech provenance](SPEECH_PROVENANCE.md).
+
+The lead reports the new WSL2 lab verified the locked Alltron API, native HA TLS, and fictional onboarding/OAuth callback exchange. Browser trust and certificate rotation were not accepted, and this observation is not evidence of household device control or HA recovery. The reported service starts do not open the activation gate.

@@ -154,6 +154,13 @@ class HASetupTests(unittest.TestCase):
             self.assertFalse((self.root / name).exists())
         self.assertEqual(self.setup.pending, {})
 
+    def test_malformed_token_type_leaves_no_authorization_files(self):
+        for token_type in (None, False, 7, [], {}):
+            with self.subTest(token_type=token_type), self.assertRaises(ValueError):
+                self.setup._save_session({"token_type": token_type}, self.origin + "/")
+        self.assertFalse((self.root / "ha-access.token").exists())
+        self.assertFalse((self.root / "ha-session.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

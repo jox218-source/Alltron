@@ -146,7 +146,10 @@ def handler_for(store: TimerStore, voice: VoiceController | None = None,
                 return
             path = urlsplit(self.path).path
             if path == "/auth/ha-callback":
-                if not auth or not ha_setup or not self._require_owner():
+                if not auth or not ha_setup:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": "HA setup is unavailable"})
+                    return
+                if not self._require_owner():
                     return
                 try:
                     query = parse_qs(urlsplit(self.path).query, max_num_fields=2, strict_parsing=True)

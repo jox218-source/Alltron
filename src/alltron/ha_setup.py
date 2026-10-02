@@ -101,7 +101,8 @@ class HASetup:
         return self.status()
 
     def _save_session(self, result, client: str, refresh: str | None = None) -> None:
-        if (not isinstance(result, dict) or result.get("token_type", "").lower() != "bearer"
+        if (not isinstance(result, dict) or not isinstance(result.get("token_type"), str)
+                or result["token_type"].lower() != "bearer"
                 or not isinstance(result.get("access_token"), str) or not TOKEN.fullmatch(result["access_token"])
                 or isinstance(result.get("expires_in"), bool) or not isinstance(result.get("expires_in"), int)
                 or not 1 <= result["expires_in"] <= 86400):

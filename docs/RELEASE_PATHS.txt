@@ -47,3 +47,4 @@ src/alltron/owner.py
 src/alltron/setup.py
 src/alltron/ha_setup.py
 tools/linux_install.py
+tools/rehearse_runner_boundary.py

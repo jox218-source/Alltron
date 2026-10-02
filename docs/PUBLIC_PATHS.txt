@@ -78,3 +78,5 @@ tests/tls_fixtures.py
 tests/test_owner_security.py
 tests/test_ha_setup.py
 tests/test_linux_install.py
+tools/rehearse_runner_boundary.py
+tests/test_runner_boundary.py

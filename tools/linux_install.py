@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import secrets
+import re
 
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -52,6 +54,26 @@ def preflight() -> dict:
             "codex_enabled": False, "live_acceptance": False}
 
 
+def local_podman() -> tuple[list[str], dict[str, str]]:
+    user()
+    import pwd
+    podman = shutil.which("podman")
+    if not podman:
+        raise ValueError("Rootless Podman unavailable")
+    prefix = [podman, "--remote=false"]
+    environment = {"PATH": os.defpath, "HOME": pwd.getpwuid(os.geteuid()).pw_dir,
+                   "XDG_RUNTIME_DIR": f"/run/user/{os.geteuid()}", "LANG": "C.UTF-8"}
+    result = subprocess.run([*prefix, "info", "--format=json"], stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True, timeout=10, env=environment, check=True)
+    if len(result.stdout) > 65536:
+        raise ValueError("Unexpected runtime metadata")
+    info = json.loads(result.stdout)
+    host = info.get("host", {}) if isinstance(info, dict) else {}
+    if host.get("serviceIsRemote") is not False or host.get("security", {}).get("rootless") is not True:
+        raise ValueError("Use a local rootless container runtime")
+    return prefix, environment
+
+
 def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_port: int = 8123) -> dict:
     user()
     checked, read, write, certificate, OwnerAuth = modules()
@@ -69,6 +91,7 @@ def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_po
     openssl, podman = shutil.which("openssl"), shutil.which("podman")
     if not openssl or not podman or not shutil.which("systemctl"):
         raise ValueError("Install OpenSSL, rootless Podman and systemd user services first")
+    local_podman()
     interpreter = Path("/usr/bin/python3")
     if not interpreter.is_file() or subprocess.run([str(interpreter), "-I", "-c", "import sys;sys.exit(sys.version_info < (3,11))"],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode:
@@ -89,7 +112,9 @@ def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_po
         marker = ha_root / "alltron-ha.json"
         if marker.exists():
             data = json.loads(read(marker, 4096))
-            if data != {"format": "alltron-ha-1", "image": HA_IMAGE, "port": ha_port}:
+            if (not isinstance(data, dict) or set(data) != {"format", "image", "port", "identity"}
+                    or data["format"] != "alltron-ha-1" or data["image"] != HA_IMAGE or data["port"] != ha_port
+                    or not isinstance(data["identity"], str) or not re.fullmatch(r"[0-9a-f]{32}", data["identity"])):
                 raise ValueError("Existing HA profile differs; do not overwrite its identity")
         else:
             if ha_root.exists() and any(ha_root.iterdir()):
@@ -99,7 +124,8 @@ def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_po
                 pending.mkdir(mode=0o700)
                 certificate(pending, "ha", openssl)
                 write(pending / "configuration.yaml", 'frontend:\nhttp:\n  ssl_certificate: /config/ha.crt\n  ssl_key: /config/ha.key\n  server_port: 8123\n')
-                write(pending / marker.name, json.dumps({"format": "alltron-ha-1", "image": HA_IMAGE, "port": ha_port}))
+                write(pending / marker.name, json.dumps({"format": "alltron-ha-1", "image": HA_IMAGE,
+                                                        "port": ha_port, "identity": secrets.token_hex(16)}))
                 if ha_root.exists():
                     ha_root.rmdir()
                 pending.rename(ha_root)
@@ -108,9 +134,7 @@ def prepare(root: Path, profile: Path, ha_root: Path, *, port: int = 8765, ha_po
         write(profile / "ha-endpoint.json", json.dumps({"port": ha_port, "ca_file": str(profile / "ha-ca.crt")}))
         launcher = content / "tools" / "linux_install.py"
         app_command = f'{quoted(interpreter)} -I -B {quoted(launcher)} run --root {quoted(root)} --profile {quoted(profile)} --port {port}'
-        ha_command = (f'{quoted(Path(podman))} run --rm --name alltron-ha --pull=never --cap-drop=ALL '
-                      f'--security-opt=no-new-privileges --pids-limit=256 --memory=2g '
-                      f'--publish=127.0.0.1:{ha_port}:8123 --volume={quoted(ha_root)}:/config:Z {HA_IMAGE}')
+        ha_command = f'{quoted(interpreter)} -I -B {quoted(launcher)} run-ha --ha-root {quoted(ha_root)}'
         app_unit = f'''[Unit]
 Description=Alltron authenticated local assistant
 After=alltron-ha.service
@@ -142,7 +166,7 @@ WantedBy=default.target
 Description=Dedicated Alltron Home Assistant container
 [Service]
 ExecStart={ha_command}
-ExecStop={quoted(Path(podman))} stop --time=20 alltron-ha
+ExecStop={quoted(interpreter)} -I -B {quoted(launcher)} stop-ha --ha-root {quoted(ha_root)}
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=30
@@ -215,6 +239,56 @@ def service(profile: Path, action: str) -> dict:
     return {"status": action, "data_preserved": True, "codex_enabled": False}
 
 
+def ha_lifecycle(ha_root: Path, *, stop: bool = False) -> None:
+    """Handle only containers with this private installation's matching identity."""
+    user()
+    _, read, _, _, _ = modules()
+    safe_path(ha_root)
+    data = json.loads(read(ha_root / "alltron-ha.json", 4096))
+    if (not isinstance(data, dict) or set(data) != {"format", "image", "port", "identity"}
+            or data["format"] != "alltron-ha-1" or data["image"] != HA_IMAGE
+            or not isinstance(data["identity"], str) or not re.fullmatch(r"[0-9a-f]{32}", data["identity"])
+            or isinstance(data["port"], bool) or not isinstance(data["port"], int) or not 1 <= data["port"] <= 65535):
+        raise ValueError("HA installation identity needs attention")
+    podman, environment = local_podman()
+    name = "alltron-ha-" + data["identity"]
+    found = subprocess.run([*podman, "container", "exists", name], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=10, env=environment).returncode
+    if found not in (0, 1):
+        raise ValueError("Container runtime unavailable")
+    if found == 0:
+        result = subprocess.run([*podman, "inspect", name], capture_output=True, text=True, timeout=10, check=True, env=environment)
+        if len(result.stdout) > 65536:
+            raise ValueError("Unexpected container metadata")
+        records = json.loads(result.stdout)
+        if not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict):
+            raise ValueError("Unexpected container metadata")
+        info = records[0]
+        identity = info.get("Id")
+        if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
+            raise ValueError("Unexpected container identity")
+        if (info.get("Config", {}).get("Labels", {}).get("io.alltron.identity") != data["identity"]
+                or info.get("Config", {}).get("Image") != HA_IMAGE
+                or not any(m.get("Source") == str(ha_root) and m.get("Destination") == "/config" for m in info.get("Mounts", []))):
+            raise ValueError("A different container uses this name; it was preserved")
+        if stop:
+            subprocess.run([*podman, "stop", "--time=20", identity], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=25, check=True, env=environment)
+            return
+        if info.get("State", {}).get("Running"):
+            raise ValueError("This HA container is already running; stop its service first")
+        subprocess.run([*podman, "rm", identity], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=True, env=environment)
+    elif stop:
+        return
+    result = subprocess.run([*podman, "run", "--rm", "--name", name, "--pull=never",
+                             "--label=io.alltron.identity=" + data["identity"], "--cap-drop=ALL",
+                             "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=2g",
+                             f"--publish=127.0.0.1:{data['port']}:8123", "--volume=" + str(ha_root) + ":/config:Z", HA_IMAGE],
+                            stdin=subprocess.DEVNULL, env=environment)
+    if result.returncode:
+        raise ValueError("HA container stopped unsuccessfully")
+
+
 def run(root: Path, profile: Path, port: int) -> None:
     user()
     with manager.locked(root):
@@ -237,6 +311,8 @@ def main() -> None:
     for name in ("root", "profile", "ha-root"):
         command.add_argument("--" + name, type=Path, required=True)
     command.add_argument("--port", type=int, default=8765)
+    for name in ("run-ha", "stop-ha"):
+        commands.add_parser(name).add_argument("--ha-root", type=Path, required=True)
     command.add_argument("--ha-port", type=int, default=8123)
     command = commands.add_parser("run")
     command.add_argument("--root", type=Path, required=True)
@@ -253,10 +329,13 @@ def main() -> None:
         elif args.command == "run":
             run(args.root, args.profile, args.port)
             return
+        elif args.command in ("run-ha", "stop-ha"):
+            ha_lifecycle(args.ha_root, stop=args.command == "stop-ha")
+            return
         else:
             result = service(args.profile, args.command)
         print(json.dumps(result, sort_keys=True))
-    except (OSError, ValueError, manager.InstallError, manager.ReleaseError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, manager.InstallError, manager.ReleaseError, subprocess.SubprocessError):
         parser.exit(1, "Linux setup stopped: check prerequisites, reviewed archive and private profile. No acceptance is implied.\n")
 
 
