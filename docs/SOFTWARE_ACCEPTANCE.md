@@ -1,6 +1,6 @@
 # Software-only acceptance checklist
 
-Evidence date: 2026-10-02. Acceptance status: partial implementation and lead-reported disposable WSL2 observations; software-only owner and Linux deployment gates remain open. A lead-reported 138-test run at `f3c1cc9` was successful, with 13 skips on Windows and 1 skip on Linux. It predates a UI health wording tweak and app-certificate rotation, so the final current-source suite count is pending. No independent VM owner trial or Codex sign-in trial has passed. A checked box requires a dated run record, exact source and image versions, sanitized results, and the disposable environment description. A plan, fictional test, partial lab observation, or local preview alone does not count as a pass.
+Evidence date: 2026-10-02. Acceptance status: implementation and reported lab evidence are partial; independent software-only owner and hardware gates remain open. At exact public code commit `806a1e7817817106521a1c959ae4c082065ac599`, the lead reports 145 tests run on Windows with 19 skipped and 145 on Linux with 1 skipped; no failures were reported. These were code tests/rehearsals, not independent acceptance. A checked box requires a dated run record, exact source and image versions, sanitized results, and the disposable environment description. A plan, fictional test, partial lab observation, or local preview alone does not count as a pass.
 
 ## Reported partial lab observations (2026-10-02)
 
@@ -8,7 +8,20 @@ The lead reports work in a new checksum-verified Ubuntu 24.04 WSL2 lab with Wind
 
 At public revision `bf7b388`, eight additional lifecycle checks reportedly passed in a headless implementer-run WSL2 rehearsal: activation was refused; exact owned service units were uninstalled; an existing Alltron database was backed up, mutated, and restored; a bad checksum was rejected without changing selected code or database; rollback to archive `b6c3ea7` preserved the application database, owner profile, HA keys, and auth state; repeat install, prepare, and service install preserved identity; services started after update; and uninstall removed only the exact user units while preserving all three private storage roots. No reboot test was run. This does not establish independent acceptance.
 
-These are reported partial observations, not final acceptance. They were performed in WSL2, not an independent VM or isolated independent network. No fresh browser certificate trust, app-certificate rotation trial, reboot recovery, independent VM owner trial, real Codex sign-in, or hardware test is recorded as passed. Home Assistant certificate rotation is not accepted. The observed revoke response is not generic confirmation that HA removed a grant. Linux service `activate` remains gated. The reported 138-test run predates app-certificate rotation, so the final full-suite count is pending.
+At code commit `806a1e7817817106521a1c959ae4c082065ac599`, the lead reports app-certificate renewal checks: the password remained intact and prior sessions were invalidated; preparation reported the active fingerprint; an HTTP client rejected the old certificate and accepted the new one; offline HA revoke returned 503, retained local files, and left the router disabled; owner-authenticated CSRF disconnect removed the three local HA files; and owned lab units were stopped/uninstalled while private data remained. These client-side TLS checks do not establish browser trust. The previous certificate and key files remain for recovery; this is not tested retirement of a compromised identity. No HA certificate rotation has been accepted.
+
+## Current status by acceptance area
+
+| Area | Evidence and current status | Remaining gate |
+| --- | --- | --- |
+| API and Home Assistant | Implemented; disposable WSL2 checks cover locked API, CSRF, synthetic HA selection/actions, expiry/outage handling and local disconnect. | Independent owner/browser trust trial and general remote revocation confirmation. An HA HTTP 200 alone is not proof that its grant was revoked. |
+| Codex | Container/runner fixture checks passed; Codex stays disabled. | Real owner login and reviewed network/credential policy are unaccepted. |
+| Linux installer lifecycle | WSL2 service and archive lifecycle rehearsal passed as reported. | Independent VM and reboot trials remain pending; activation stays gated. |
+| Guided setup | Owner setup UI and docs are implemented. | Independent first-time owner usability and recovery trial remains pending. |
+| Source archive | Windows and Linux actual-archive install/run/locks/state/backup/restore rehearsals reportedly passed at `806a1e7`. | Implementer-run evidence only; independent owner trial remains open. |
+| Dependencies and speech | The planned dependency replacement (action 7) and unbundled speech-provenance work are prepared; no model, voice or media assets are bundled. | CI evidence remains pending; exact asset acceptance and hardware speech/performance testing are deferred. |
+
+These are reported partial observations, not final acceptance. They were performed in WSL2, not an independent VM or isolated independent network. No fresh browser certificate trust, reboot recovery, independent VM owner trial, real Codex sign-in, or hardware test is recorded as passed. Home Assistant certificate rotation is not accepted. The observed revoke response is not generic confirmation that HA removed a grant. Linux service `activate` remains gated. The 145-test code run at `806a1e7` is evidence for that exact revision and is not independent acceptance.
 
 ## Disposable Linux owner trial
 
